@@ -2,9 +2,9 @@
 
 namespace BIWEB\LaravelOpenapi;
 
+use BIWEB\LaravelOpenapi\Commands\LaravelOpenapiCommand;
 use Spatie\LaravelPackageTools\Package;
 use Spatie\LaravelPackageTools\PackageServiceProvider;
-use BIWEB\LaravelOpenapi\Commands\LaravelOpenapiCommand;
 
 class LaravelOpenapiServiceProvider extends PackageServiceProvider
 {
@@ -18,8 +18,6 @@ class LaravelOpenapiServiceProvider extends PackageServiceProvider
         $package
             ->name('laravel-openapi')
             ->hasConfigFile()
-            ->hasViews()
-            ->hasMigration('create_openapi_table')
             ->hasCommand(LaravelOpenapiCommand::class);
     }
 }
