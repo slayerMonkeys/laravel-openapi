@@ -10,7 +10,7 @@ The skeleton's tooling files are **not present**: no `tests/` directory, `phpuni
 
 ## Commands
 
-Requires PHP ^8.4. Supports Laravel 11/12/13 (`illuminate/contracts`), tested via Orchestra Testbench 9/10/11.
+Requires PHP ^8.3. Supports Laravel 12/13 (`illuminate/contracts`), tested via Orchestra Testbench 10/11.
 
 ```bash
 composer install
