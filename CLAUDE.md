@@ -32,4 +32,4 @@ vendor/bin/pest --filter "test description" # a single test
 - Testbench doesn't load the provider automatically (there's no `testbench.yaml`), so `vendor/bin/testbench vendor:publish …` shows nothing until one is added or the provider is registered in the tests' `TestCase`.
 - Migrations are `.php.stub` files in `database/migrations/`, which get published into the host app. The name passed to `hasMigration()` must match the stub's filename without extension (e.g. `create_openapi_table` ↔ `create_openapi_table.php.stub`).
 - `src/Facades/LaravelOpenapi.php` resolves the `BIWEB\LaravelOpenapi\LaravelOpenapi` class from the container.
-- `src/Commands/LaravelOpenapiCommand.php` is the placeholder Artisan command (`php artisan laravel-openapi`).
+- `src/Commands/GenerateCommand.php` is `php artisan openapi:generate {document?} {--all} {--output=} {--format=}`: it writes `generate()` to the document's `output` as JSON, or YAML (`symfony/yaml`) for a `.yaml`/`.yml` file or `--format=yaml`.

@@ -296,9 +296,9 @@ propres préfixes. Les `security_schemes` de la config (tableaux) sont convertis
 **Description :** la commande `openapi:generate {document?} {--all} {--output=} {--format=}` remplace le placeholder. Le format vient de `--format`, sinon de l'extension. Le YAML passe par `symfony/yaml` (avec `DUMP_OBJECT_AS_MAP`). Les répertoires manquants sont créés. Les erreurs `InvalidOpenapiDefinition` donnent un message et le code `FAILURE`.
 
 **Critères d'acceptation :**
-- [ ] Le fichier JSON écrit est égal à `generate()`, et le YAML relu par `Yaml::parse` est égal au JSON.
-- [ ] `--all` écrit un fichier par document.
-- [ ] Un document inconnu ou une annotation invalide donne un code de sortie non nul et un message qui nomme la cause.
+- [x] Le fichier JSON écrit est égal à `generate()`, et le YAML relu par `Yaml::parse` est égal au JSON.
+- [x] `--all` écrit un fichier par document.
+- [x] Un document inconnu ou une annotation invalide donne un code de sortie non nul et un message qui nomme la cause.
 
 **Vérification :** `vendor/bin/pest tests/Feature/GenerateCommandTest.php`, et `composer update --prefer-lowest` reste vert
 
