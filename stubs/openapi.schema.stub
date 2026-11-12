@@ -1,0 +1,17 @@
+<?php
+
+namespace {{ namespace }};
+
+use BIWEB\LaravelOpenapi\Definitions\Reusable;
+use BIWEB\LaravelOpenapi\Definitions\Schema;
+use BIWEB\LaravelOpenapi\OpenApi\Objects;
+
+class {{ class }} extends Schema implements Reusable
+{
+    public function build(): Objects\Schema
+    {
+        return Objects\Schema::object()
+            ->properties(Objects\Schema::integer('id'))
+            ->required('id');
+    }
+}
