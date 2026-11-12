@@ -74,12 +74,13 @@ Vérification commune à chaque tâche : `composer test`, `composer analyse`, `v
 
 ### T4 : `#[Schema]` / `#[Property]` : scalaires, nullable, required
 
-**Description :** `SchemaFactory` transforme une classe `#[Schema]` en schéma `object` : il déduit `int`/`float`/`string`/`bool`, le rend nullable (`nullable: true` en 3.0, `["T","null"]` en 3.1) et calcule `required` (non nullable et sans valeur par défaut, sauf `required` explicite). Les surcharges `#[Property]` (type, format, description, example) sont appliquées. Le schéma est enregistré dans `components.schemas`.
+**Description :** `SchemaFactory` transforme une classe `#[Schema]` en schéma `object` : il déduit `int`/`float`/`string`/`bool`, le rend nullable (`nullable: true` en 3.0, `["T","null"]` en 3.1) et calcule `required` (non nullable et sans valeur par défaut, sauf `required` explicite). Les surcharges `#[Property]` (type, format, description, example) sont appliquées. Des `#[Property(name:, type:)]` répétés sur la classe (API Resources, modèles) remplacent la lecture des propriétés PHP. Le schéma est enregistré dans `components.schemas`.
 
 **Critères d'acceptation :**
-- [ ] La table de déduction de la spec est couverte en 3.0 et en 3.1 (tests Unit, avec dataset).
-- [ ] Les règles `required` sont vérifiées : nullable, valeur par défaut, `required: true/false` explicite.
-- [ ] Une classe sans `#[Schema]` passée à la factory lève une erreur qui nomme la classe.
+- [x] La table de déduction de la spec est couverte en 3.0 et en 3.1 (tests Unit, avec dataset).
+- [x] Les règles `required` sont vérifiées : nullable, valeur par défaut, `required: true/false` explicite.
+- [x] Une classe sans `#[Schema]` passée à la factory lève une erreur qui nomme la classe.
+- [x] Une `JsonResource` décrite par des `#[Property]` de classe ne donne que les champs déclarés, et un `name` ou un `type` manquant lève une erreur qui nomme la classe.
 
 **Vérification :** `vendor/bin/pest tests/Unit/SchemaFactoryTest.php`
 
@@ -117,6 +118,7 @@ Vérification commune à chaque tâche : `composer test`, `composer analyse`, `v
 **Critères d'acceptation :**
 - [ ] `#[Response(200, schema: UserData::class, isList: true)]` donne `content.application/json.schema = {type: array, items: {$ref}}`.
 - [ ] `#[Response(204, 'Supprimé')]` est émis sans `content`.
+- [ ] Une réponse `JsonResource` est enveloppée selon `$wrap` (`{data: $ref}`, ou `data` en tableau avec `isList`), et ne l'est pas si `$wrap` vaut `null`.
 - [ ] Les fixtures complètes sont valides et égales aux fichiers `expected/`, en 3.0 et en 3.1.
 
 **Vérification :** `vendor/bin/pest tests/Feature/FullDocumentTest.php`

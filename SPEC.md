@@ -40,9 +40,9 @@ Utilisateur cible : un développeur Laravel qui veut une spec OpenAPI fiable et 
 | `Operation(summary, description, operationId, tags, deprecated, security, documents)` | méthode ou classe invocable | **Opt-in** : seules les routes dont l'action porte cet attribut sont documentées. `documents` (liste de noms, vide = tous) restreint l'opération à certains documents. |
 | `Parameter(name, in, type, format, required, description)` | méthode ou classe invocable, répétable | Paramètre `query` / `header` / `path` / `cookie`. |
 | `RequestBody(schema, contentType = 'application/json', required = true, description)` | méthode ou classe invocable | `schema` : un `class-string` portant `#[Schema]`. |
-| `Response(status, description, schema = null, contentType = 'application/json', isList = false)` | méthode ou classe invocable, répétable | `isList: true` donne `{type: array, items: $ref}`. |
+| `Response(status, description, schema = null, contentType = 'application/json', isList = false)` | méthode ou classe invocable, répétable | `isList: true` donne `{type: array, items: $ref}`. Une `JsonResource` est enveloppée (voir ci-dessous). |
 | `Schema(name = null, description = null)` | classe | Composant `components/schemas/{name ?? short class name}`. |
-| `Property(type, format, description, nullable, required, example, items)` | propriété (y compris promue) | Les arguments surchargent ce qui est déduit du type PHP natif. |
+| `Property(name, type, format, description, nullable, required, example, items)` | propriété (y compris promue), ou classe (répétable) | Sur une propriété, les arguments surchargent ce qui est déduit du type PHP natif et `name` est ignoré. Sur la classe, `name` et `type` sont obligatoires (voir ci-dessous). |
 
 **Classes invocables (ADR)** : Laravel résout `Route::get(…, ShowUserAction::class)` en `ShowUserAction@__invoke` (`RouteAction::makeInvokable`). Pour une action `__invoke`, les attributs d'opération peuvent être posés **sur la classe ou sur `__invoke`, mais pas sur les deux**. Une opération répartie sur les deux lève une erreur qui nomme la classe. Sur un contrôleur classique (action autre que `__invoke`), les attributs d'opération posés sur la classe sont ignorés.
 
@@ -59,6 +59,10 @@ Utilisateur cible : un développeur Laravel qui veut une spec OpenAPI fiable et 
 | `?T` | nullable (voir ci-dessous) |
 
 Une propriété est **required** si elle n'est pas nullable et n'a pas de valeur par défaut, sauf `#[Property(required: …)]` explicite.
+
+**Propriétés déclarées sur la classe (API Resources, modèles)** : les champs d'une `JsonResource` (sortie de `toArray()`) ou d'un modèle Eloquent ne sont pas des propriétés PHP. On les déclare par des `#[Property(name: …, type: …)]` répétés sur la classe. Dès qu'une classe porte au moins un `#[Property]` de classe, **ses propriétés PHP ne sont pas lues**. Rien n'est déduit : `name` et `type` manquants lèvent une erreur qui nomme la classe, `nullable` vaut `false` par défaut, et la propriété est required si elle n'est pas nullable, sauf `required:` explicite. `toArray()` n'est jamais lu.
+
+**Enveloppe des Resources** : une réponse dont le `schema` est une sous-classe de `JsonResource` suit son enveloppe `$wrap` (`data` par défaut) : `{type: object, properties: {data: $ref}, required: [data]}`, ou `data: {type: array, items: $ref}` avec `isList: true`. Si `$wrap` vaut `null`, le schéma n'est pas enveloppé. Les `links`/`meta` de pagination ne sont pas documentés en v1.
 
 **Différences 3.0 / 3.1** gérées par le paquet :
 
@@ -183,6 +187,15 @@ final class UserData
         public Role $role = Role::Member,
     ) {}
 }
+
+#[Schema]
+#[Property('id', type: 'integer')]
+#[Property('email', type: 'string', format: 'email')]
+#[Property('nickname', type: 'string', nullable: true)]
+final class UserResource extends JsonResource
+{
+    public function toArray(Request $request): array { /* … */ }
+}
 ```
 
 Le document est construit sous forme de **tableaux PHP**, sans arbre d'objets OpenAPI intermédiaire. Les clés vides ou nulles sont omises de la sortie.
@@ -191,7 +204,7 @@ Le document est construit sous forme de **tableaux PHP**, sans arbre d'objets Op
 
 - **Pest + Testbench** ; `TestCase` enregistre le provider et définit les routes de fixtures dans `defineRoutes()`.
 - **Feature (le cœur)** : une app de fixtures couvrant toutes les fonctionnalités est générée en 3.0 et en 3.1. Chaque document est **validé contre le méta-schéma officiel** de sa version, puis comparé à `tests/Fixtures/expected/*.json` (`toEqual` sur les tableaux décodés). Les fixtures incluent un contrôleur classique et des Actions invocables, annotées sur la classe pour l'une et sur `__invoke` pour l'autre.
-- **Unit** : table de déduction des types (y compris enum et nullable dans les deux versions), règle `required`, erreurs (`items` absent, classe sans `#[Schema]`, collision de noms de composants, attributs à la fois sur la classe et sur `__invoke`, version `openapi` invalide).
+- **Unit** : table de déduction des types (y compris enum et nullable dans les deux versions), règle `required`, propriétés déclarées sur la classe (`JsonResource`), erreurs (`items` absent, classe sans `#[Schema]`, collision de noms de composants, attributs à la fois sur la classe et sur `__invoke`, version `openapi` invalide).
 - **Commande** : écriture JSON et YAML (le YAML relu par `Yaml::parse` doit être égal au JSON), `--all`, document inconnu → code de sortie non nul.
 - **Route** : désactivée → 404 ; activée sans fichier → 404 ; activée avec un fichier → 200 avec son contenu et le bon `Content-Type` (JSON et YAML) ; middleware appliqué.
 - **Arch** (existant) : pas de `dd`/`dump`/`ray`.
@@ -222,6 +235,7 @@ Le document est construit sous forme de **tableaux PHP**, sans arbre d'objets Op
 4. Les versions supportées sont celles de `composer.json` : PHP ^8.3, Laravel 12/13, Testbench 10/11.
 5. Une collision de noms de composants lève une erreur.
 6. Les attributs d'opération sont compatibles avec les classes invocables (ADR).
+7. (2026-11-12) Les API Resources et les modèles sont documentés par des `#[Property(name:, type:)]` répétés sur la classe, sans lecture de `toArray()`. Les réponses `JsonResource` suivent l'enveloppe `$wrap`.
 
 ## Questions ouvertes
 

@@ -49,7 +49,7 @@ T3 et T4 sont indépendantes une fois T2 terminée.
 - [ ] Revue humaine : forme des attributs d'opération (signature figée après la release)
 
 ### Phase 2 : schémas
-- [ ] T4 : `#[Schema]` / `#[Property]` : scalaires, nullable 3.0/3.1, required
+- [x] T4 : `#[Schema]` / `#[Property]` : scalaires, nullable 3.0/3.1, required
 - [ ] T5 : `$ref` imbriqués, tableaux, enums, collisions de noms
 - [ ] T6 : `#[RequestBody]` / `#[Response]`
 
