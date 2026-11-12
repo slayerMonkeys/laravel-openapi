@@ -4,20 +4,25 @@ namespace BIWEB\LaravelOpenapi;
 
 use BIWEB\LaravelOpenapi\Attributes\Operation;
 use BIWEB\LaravelOpenapi\Attributes\Parameter;
+use BIWEB\LaravelOpenapi\Attributes\Parameters;
+use BIWEB\LaravelOpenapi\Attributes\RequestBody;
+use BIWEB\LaravelOpenapi\Attributes\Response;
 use BIWEB\LaravelOpenapi\Exceptions\InvalidOpenapiDefinition;
 use BIWEB\LaravelOpenapi\OpenApi\Enums\HttpMethod;
 use BIWEB\LaravelOpenapi\OpenApi\Enums\ParameterIn;
 use BIWEB\LaravelOpenapi\OpenApi\Enums\SchemaType;
 use BIWEB\LaravelOpenapi\OpenApi\Objects;
+use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Routing\Route;
 use Illuminate\Support\Facades\Route as Router;
 use Illuminate\Support\Str;
+use ReflectionAttribute;
 use ReflectionClass;
 use ReflectionMethod;
 
 class LaravelOpenapi
 {
-    private const OPERATION_ATTRIBUTES = [Operation::class, Parameter::class];
+    private const OPERATION_ATTRIBUTES = [Operation::class, Parameter::class, Parameters::class, RequestBody::class, Response::class];
 
     /** @return array<string, mixed> */
     public function generate(?string $document = null): array
@@ -35,12 +40,15 @@ class LaravelOpenapi
             throw new InvalidOpenapiDefinition("Unsupported OpenAPI version [{$version}] in document [{$document}], expected 3.0.x or 3.1.x.");
         }
 
-        return Objects\OpenApi::create()
+        $components = new Components;
+
+        $openapi = $components->resolve(Objects\OpenApi::create()
             ->openapi($version)
             ->info($this->info($config['info'] ?? []))
             ->servers(...array_map($this->server(...), $config['servers'] ?? []))
-            ->paths(...$this->paths($config['routes']['prefixes'] ?? []))
-            ->toArray($version);
+            ->paths(...$this->paths($config['routes']['prefixes'] ?? [], $components)));
+
+        return $openapi->components($components->toObject())->toArray($version);
     }
 
     /** @param  array<string, mixed>  $info */
@@ -78,7 +86,7 @@ class LaravelOpenapi
      * @param  list<string>  $prefixes
      * @return list<Objects\PathItem>
      */
-    private function paths(array $prefixes): array
+    private function paths(array $prefixes, Components $components): array
     {
         $paths = [];
 
@@ -106,7 +114,7 @@ class LaravelOpenapi
 
             foreach (PathExpander::expand($route->uri()) as $path => $optional) {
                 foreach ($verbs as $verb) {
-                    $paths[$path][] = $this->operation($operation, $source, $route, $path, $optional)->method(HttpMethod::from($verb));
+                    $paths[$path][] = $this->operation($operation, $source, $route, $path, $optional, $components)->method(HttpMethod::from($verb));
                 }
             }
         }
@@ -167,11 +175,13 @@ class LaravelOpenapi
      * @param  ReflectionClass<object>|ReflectionMethod  $source
      * @param  list<string>  $optional  the optional parameters present in this variant of the path
      */
-    private function operation(Operation $operation, ReflectionClass|ReflectionMethod $source, Route $route, string $path, array $optional): Objects\Operation
+    private function operation(Operation $operation, ReflectionClass|ReflectionMethod $source, Route $route, string $path, array $optional, Components $components): Objects\Operation
     {
         preg_match_all('/\{(\w+)\??\}/', $route->uri(), $uri);
         preg_match_all('/\{(\w+)\}/', $path, $variant);
         $label = $source instanceof ReflectionMethod ? "{$source->class}@{$source->name}" : $source->name;
+        // an optional path parameter only belongs to the variants that contain it
+        $absent = fn (string $in, string $name) => $in === 'path' && in_array($name, $uri[1], true) && ! in_array($name, $variant[1], true);
 
         // keyed by in + name, the pair OpenAPI requires to be unique, so an explicit #[Parameter] replaces the implicit one
         $parameters = [];
@@ -180,12 +190,21 @@ class LaravelOpenapi
             $parameters["path.{$name}"] = Objects\Parameter::path()->name($name)->required()->schema(Objects\Schema::string());
         }
 
+        foreach ($source->getAttributes(Parameters::class) as $attribute) {
+            foreach ($attribute->newInstance()->classes as $class) {
+                foreach ($components->parameters($class) as $key => $parameter) {
+                    if (! $absent(...explode('.', $key, 2))) {
+                        $parameters[$key] = $parameter;
+                    }
+                }
+            }
+        }
+
         foreach ($source->getAttributes(Parameter::class) as $attribute) {
             $parameter = $attribute->newInstance();
             $in = $parameter->in ?? (in_array($parameter->name, $uri[1], true) ? 'path' : 'query');
 
-            // an optional path parameter only belongs to the variants that contain it
-            if ($in === 'path' && in_array($parameter->name, $uri[1], true) && ! in_array($parameter->name, $variant[1], true)) {
+            if ($absent($in, $parameter->name)) {
                 continue;
             }
 
@@ -199,6 +218,8 @@ class LaravelOpenapi
                     ->format($parameter->format));
         }
 
+        $body = ($source->getAttributes(RequestBody::class)[0] ?? null)?->newInstance();
+
         $object = Objects\Operation::create()
             ->tags(...$operation->tags)
             ->summary($operation->summary)
@@ -206,12 +227,53 @@ class LaravelOpenapi
             // each variant of an optional path needs its own operationId: listComments, listCommentsByComment
             ->operationId($operation->operationId === null ? null : $operation->operationId.implode('', array_map(fn (string $name) => 'By'.Str::studly($name), $optional)))
             ->parameters(...array_values($parameters))
+            ->requestBody($body === null ? null : $this->requestBody($body, $label))
+            ->responses(...array_map(fn (ReflectionAttribute $attribute) => $this->response($attribute->newInstance(), $label), $source->getAttributes(Response::class)))
             ->deprecated($operation->deprecated ?: null);
 
         return $operation->security === [] ? $object->noSecurity() : $object->security(...array_map(
             fn (array $requirement) => $this->securityRequirement($requirement, $label),
             $operation->security ?? [],
         ));
+    }
+
+    private function requestBody(RequestBody $body, string $label): Objects\RequestBody
+    {
+        if (is_subclass_of($body->body, Definitions\RequestBody::class)) {
+            return $body->contentType === 'application/json' && $body->required && $body->description === null
+                ? Objects\RequestBody::ref($body->body)
+                : throw new InvalidOpenapiDefinition("Request body [{$body->body}] of [{$label}] is a definition, which forbids the other arguments of #[RequestBody].");
+        }
+
+        return Objects\RequestBody::create()
+            ->description($body->description)
+            ->content(Objects\MediaType::create()->mediaType($body->contentType)->schema(Objects\Schema::ref($body->body)))
+            ->required($body->required ?: null);
+    }
+
+    private function response(Response $response, string $label): Objects\Response
+    {
+        if (is_string($response->status) && class_exists($response->status)) {
+            return $response->description === '' && $response->schema === null && $response->contentType === 'application/json' && ! $response->isList
+                ? Objects\Response::ref($response->status)
+                : throw new InvalidOpenapiDefinition("Response [{$response->status}] of [{$label}] is a definition, which forbids the other arguments of #[Response].");
+        }
+
+        return Objects\Response::create()
+            ->statusCode($response->status)
+            ->description($response->description)
+            ->content(...($response->schema === null ? [] : [
+                Objects\MediaType::create()->mediaType($response->contentType)->schema($this->responseSchema($response->schema, $response->isList)),
+            ]));
+    }
+
+    // a JsonResource is wrapped in its $wrap key (data by default), unless $wrap is null
+    private function responseSchema(string $class, bool $isList): Objects\Schema
+    {
+        $schema = $isList ? Objects\Schema::array()->items(Objects\Schema::ref($class)) : Objects\Schema::ref($class);
+        $wrap = is_subclass_of($class, JsonResource::class) ? $class::$wrap : null;
+
+        return $wrap === null ? $schema : Objects\Schema::object()->properties($schema->objectId($wrap))->required($wrap);
     }
 
     /** @param  array<string, list<string>>  $requirement */

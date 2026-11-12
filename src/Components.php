@@ -65,14 +65,17 @@ class Components
     /**
      * A Definitions\Parameters: one component per parameter, named by its objectId, otherwise by its name.
      *
-     * @return list<Objects\Parameter>
+     * @return array<string, Objects\Parameter> keyed by in + name, the pair OpenAPI requires to be unique
      */
     public function parameters(string $class): array
     {
-        return array_map(
-            fn (Objects\Parameter $parameter) => $this->reference($class, $parameter, 'parameters', $parameter->getObjectId() ?? $parameter->getName()),
-            $this->definition($class, Definitions\Parameters::class)->build(),
-        );
+        $parameters = [];
+
+        foreach ($this->definition($class, Definitions\Parameters::class)->build() as $parameter) {
+            $parameters["{$parameter->getIn()?->value}.{$parameter->getName()}"] = $this->reference($class, $parameter, 'parameters', $parameter->getObjectId() ?? $parameter->getName());
+        }
+
+        return $parameters;
     }
 
     /** The registered components, null when nothing is referenced. */
