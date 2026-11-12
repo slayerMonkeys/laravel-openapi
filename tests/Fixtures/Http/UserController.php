@@ -5,6 +5,9 @@ namespace BIWEB\LaravelOpenapi\Tests\Fixtures\Http;
 use BIWEB\LaravelOpenapi\Attributes\Operation;
 use BIWEB\LaravelOpenapi\Attributes\Parameter;
 
+// ignored: class-level attributes only apply to invokable actions
+#[Operation(summary: 'Ignored')]
+#[Parameter(name: 'ignored')]
 class UserController
 {
     #[Operation(summary: 'List users', description: 'Paginated list.', tags: ['users'])]
