@@ -5,6 +5,8 @@ namespace BIWEB\LaravelOpenapi;
 use BIWEB\LaravelOpenapi\Attributes\Property;
 use BIWEB\LaravelOpenapi\Attributes\Schema;
 use BIWEB\LaravelOpenapi\Exceptions\InvalidOpenapiDefinition;
+use BIWEB\LaravelOpenapi\OpenApi\Enums\SchemaType;
+use BIWEB\LaravelOpenapi\OpenApi\Objects;
 use ReflectionClass;
 use ReflectionNamedType;
 use ReflectionProperty;
@@ -12,19 +14,13 @@ use ReflectionType;
 
 class SchemaFactory
 {
-    private const SCALARS = ['int' => 'integer', 'float' => 'number', 'string' => 'string', 'bool' => 'boolean'];
+    private const SCALARS = ['int' => SchemaType::INTEGER, 'float' => SchemaType::NUMBER, 'string' => SchemaType::STRING, 'bool' => SchemaType::BOOLEAN];
 
-    /** @var array<string, array<string, mixed>> */
+    /** @var array<string, Objects\Schema> */
     private array $schemas = [];
 
-    public function __construct(private readonly string $version) {}
-
-    /**
-     * Registers the #[Schema] class in components.schemas and returns its reference.
-     *
-     * @return array{'$ref': string}
-     */
-    public function ref(string $class): array
+    /** Registers the #[Schema] class in components.schemas and returns its reference. */
+    public function ref(string $class): Objects\Schema
     {
         $attribute = class_exists($class) ? ((new ReflectionClass($class))->getAttributes(Schema::class)[0] ?? null) : null;
 
@@ -36,22 +32,19 @@ class SchemaFactory
         $schema = $attribute->newInstance();
         $name = $schema->name ?? $reflection->getShortName();
 
-        $this->schemas[$name] ??= $this->object($reflection, $schema);
+        $this->schemas[$name] ??= $this->object($reflection, $schema)->objectId($name);
 
-        return ['$ref' => "#/components/schemas/{$name}"];
+        return Objects\Schema::ref("#/components/schemas/{$name}");
     }
 
-    /** @return array<string, array<string, mixed>> */
+    /** @return array<string, Objects\Schema> keyed by component name, which is also each schema's objectId */
     public function schemas(): array
     {
         return $this->schemas;
     }
 
-    /**
-     * @param  ReflectionClass<object>  $reflection
-     * @return array<string, mixed>
-     */
-    private function object(ReflectionClass $reflection, Schema $schema): array
+    /** @param  ReflectionClass<object>  $reflection */
+    private function object(ReflectionClass $reflection, Schema $schema): Objects\Schema
     {
         $properties = [];
         $required = [];
@@ -63,15 +56,13 @@ class SchemaFactory
                 $required[] = $name;
             }
 
-            $properties[$name] = $this->property("{$reflection->name}::\${$name}", $type, $override, $nullable);
+            $properties[] = $this->property("{$reflection->name}::\${$name}", $type, $override, $nullable)->objectId($name);
         }
 
-        return array_filter([
-            'type' => 'object',
-            'description' => $schema->description,
-            'properties' => $properties,
-            'required' => $required,
-        ]);
+        return Objects\Schema::object()
+            ->description($schema->description)
+            ->properties(...$properties)
+            ->required(...$required);
     }
 
     /**
@@ -104,22 +95,18 @@ class SchemaFactory
         return $fields;
     }
 
-    /** @return array<string, mixed> */
-    private function property(string $label, ?ReflectionType $type, ?Property $override, bool $nullable): array
+    private function property(string $label, ?ReflectionType $type, ?Property $override, bool $nullable): Objects\Schema
     {
         $deduced = $type instanceof ReflectionNamedType ? (self::SCALARS[$type->getName()] ?? null) : null;
-        $openapiType = $override->type ?? $deduced
-            ?? throw new InvalidOpenapiDefinition("Property [{$label}] has no type a schema can be deduced from, set #[Property(type: …)].");
+        $openapiType = $override?->type === null ? $deduced : SchemaType::tryFrom($override->type)
+            ?? throw new InvalidOpenapiDefinition("Property [{$label}] has an unknown type [{$override->type}].");
 
-        $is30 = str_starts_with($this->version, '3.0');
-
-        return array_filter([
-            'type' => $nullable && ! $is30 ? [$openapiType, 'null'] : $openapiType,
-            'format' => $override?->format,
-            'description' => $override?->description,
-            'nullable' => $nullable && $is30 ? true : null,
-            'example' => $override?->example,
-        ], fn ($value) => $value !== null);
+        return Objects\Schema::create()
+            ->type($openapiType ?? throw new InvalidOpenapiDefinition("Property [{$label}] has no type a schema can be deduced from, set #[Property(type: …)]."))
+            ->format($override?->format)
+            ->description($override?->description)
+            ->nullable($nullable ?: null)
+            ->example($override?->example);
     }
 
     // a promoted property only carries its default on the constructor parameter
