@@ -2,25 +2,27 @@
 
 namespace BIWEB\LaravelOpenapi;
 
+use BackedEnum;
 use BIWEB\LaravelOpenapi\Attributes\Property;
 use BIWEB\LaravelOpenapi\Attributes\Schema;
 use BIWEB\LaravelOpenapi\Exceptions\InvalidOpenapiDefinition;
 use BIWEB\LaravelOpenapi\OpenApi\Enums\SchemaType;
 use BIWEB\LaravelOpenapi\OpenApi\Objects;
 use ReflectionClass;
+use ReflectionEnum;
 use ReflectionNamedType;
 use ReflectionProperty;
 use ReflectionType;
 
 class SchemaFactory
 {
-    private const SCALARS = ['int' => SchemaType::INTEGER, 'float' => SchemaType::NUMBER, 'string' => SchemaType::STRING, 'bool' => SchemaType::BOOLEAN];
+    private const BUILTINS = ['int' => SchemaType::INTEGER, 'float' => SchemaType::NUMBER, 'string' => SchemaType::STRING, 'bool' => SchemaType::BOOLEAN, 'array' => SchemaType::ARRAY];
 
-    /** @var array<string, Objects\Schema> */
-    private array $schemas = [];
-
-    /** Registers the #[Schema] class in components.schemas and returns its reference. */
-    public function ref(string $class): Objects\Schema
+    /**
+     * The schema of a #[Schema] class, whose objectId is its component name. Nested classes are left as class-string
+     * references, resolved by Components.
+     */
+    public function build(string $class): Objects\Schema
     {
         $attribute = class_exists($class) ? ((new ReflectionClass($class))->getAttributes(Schema::class)[0] ?? null) : null;
 
@@ -30,17 +32,8 @@ class SchemaFactory
 
         $reflection = new ReflectionClass($class);
         $schema = $attribute->newInstance();
-        $name = $schema->name ?? $reflection->getShortName();
 
-        $this->schemas[$name] ??= $this->object($reflection, $schema)->objectId($name);
-
-        return Objects\Schema::ref("#/components/schemas/{$name}");
-    }
-
-    /** @return array<string, Objects\Schema> keyed by component name, which is also each schema's objectId */
-    public function schemas(): array
-    {
-        return $this->schemas;
+        return $this->object($reflection, $schema)->objectId($schema->name ?? $reflection->getShortName());
     }
 
     /** @param  ReflectionClass<object>  $reflection */
@@ -97,12 +90,32 @@ class SchemaFactory
 
     private function property(string $label, ?ReflectionType $type, ?Property $override, bool $nullable): Objects\Schema
     {
-        $deduced = $type instanceof ReflectionNamedType ? (self::SCALARS[$type->getName()] ?? null) : null;
-        $openapiType = $override?->type === null ? $deduced : SchemaType::tryFrom($override->type)
-            ?? throw new InvalidOpenapiDefinition("Property [{$label}] has an unknown type [{$override->type}].");
+        $class = $override?->type === null && $type instanceof ReflectionNamedType && ! $type->isBuiltin() ? $type->getName() : null;
 
-        return Objects\Schema::create()
-            ->type($openapiType ?? throw new InvalidOpenapiDefinition("Property [{$label}] has no type a schema can be deduced from, set #[Property(type: …)]."))
+        if ($class !== null && ! is_subclass_of($class, BackedEnum::class)) {
+            // shortcut: a $ref has no siblings, so a nullable reference is emitted as non-nullable, wrap it in a composition when needed
+            return Objects\Schema::ref($class);
+        }
+
+        if ($class !== null) {
+            $schema = Objects\Schema::create()
+                ->type(self::BUILTINS[(string) (new ReflectionEnum($class))->getBackingType()])
+                ->enum(...array_column($class::cases(), 'value'));
+        } else {
+            $deduced = $type instanceof ReflectionNamedType ? (self::BUILTINS[$type->getName()] ?? null) : null;
+            $openapiType = $override?->type === null ? $deduced : SchemaType::tryFrom($override->type)
+                ?? throw new InvalidOpenapiDefinition("Property [{$label}] has an unknown type [{$override->type}].");
+
+            $schema = Objects\Schema::create()
+                ->type($openapiType ?? throw new InvalidOpenapiDefinition("Property [{$label}] has no type a schema can be deduced from, set #[Property(type: …)]."));
+
+            if ($openapiType === SchemaType::ARRAY) {
+                $items = $override->items ?? throw new InvalidOpenapiDefinition("Property [{$label}] is an array without items, set #[Property(items: …)].");
+                $schema = $schema->items(SchemaType::tryFrom($items) === null ? Objects\Schema::ref($items) : Objects\Schema::create()->type(SchemaType::from($items)));
+            }
+        }
+
+        return $schema
             ->format($override?->format)
             ->description($override?->description)
             ->nullable($nullable ?: null)

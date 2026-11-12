@@ -182,10 +182,10 @@ Un `array` exige `#[Property(items: …)]`. Un `BackedEnum` donne son type de ba
 classes qui donnent le même nom de composant lèvent une erreur.
 
 **Critères d'acceptation :**
-- [ ] Une référence circulaire (`User` → `Team` → `User`) se termine, avec deux composants et des `$ref`.
-- [ ] Un `array` sans `items` lève une erreur qui nomme la classe et la propriété.
-- [ ] Une collision `A\User` / `B\User` lève une erreur qui nomme les deux classes, et `#[Schema(name:)]` la résout.
-- [ ] Un composant qui n'est référencé nulle part n'est pas émis.
+- [x] Une référence circulaire (`User` → `Team` → `User`) se termine, avec deux composants et des `$ref`.
+- [x] Un `array` sans `items` lève une erreur qui nomme la classe et la propriété.
+- [x] Une collision `A\User` / `B\User` lève une erreur qui nomme les deux classes, et `#[Schema(name:)]` la résout.
+- [x] Un composant qui n'est référencé nulle part n'est pas émis.
 
 **Vérification :** `vendor/bin/pest tests/Unit/SchemaFactoryTest.php tests/Unit/ComponentsTest.php`
 
