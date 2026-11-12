@@ -29,6 +29,19 @@ it('rejects an invalid document with both validators', function (string $version
         ->toThrow(ExpectationFailedException::class);
 })->with(['3.0.3', '3.1.0']);
 
+it('rejects an invalid nested parameter with both validators', function (string $version) {
+    $document = [
+        'openapi' => $version,
+        'info' => ['title' => 'API', 'version' => '1.0.0'],
+        'paths' => ['/users/{id}' => ['get' => [
+            'parameters' => [['name' => 'id', 'in' => 'path', 'schema' => ['type' => 'string']]],
+            'responses' => ['204' => ['description' => 'OK']],
+        ]]],
+    ];
+
+    expect(fn () => expect($document)->toBeValidOpenapi())->toThrow(ExpectationFailedException::class);
+})->with(['3.0.3', '3.1.0']);
+
 it('rejects an unsupported openapi version', function (string $version) {
     config()->set('openapi.documents.default.openapi', $version);
 

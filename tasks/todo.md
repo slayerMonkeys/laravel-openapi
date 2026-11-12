@@ -31,9 +31,9 @@ Vérification commune à chaque tâche : `composer test`, `composer analyse`, `v
 **Description :** les attributs `Operation` et `Parameter` sont créés. Les routes du préfixe configuré dont l'action porte `#[Operation]` deviennent des `paths` : summary, description, tags, deprecated, operationId, security, puis paramètres explicites et paramètres de chemin `{x}` ajoutés automatiquement. Les routes closure, les routes hors préfixe et la méthode `HEAD` sont exclues.
 
 **Critères d'acceptation :**
-- [ ] Une route sans `#[Operation]` est absente, même dans le préfixe ; une route annotée hors préfixe aussi.
-- [ ] `{id}` donne un paramètre path required de type string, qu'un `#[Parameter(name: 'id', type: 'integer')]` remplace.
-- [ ] Un `operationId` explicite sur une route à plusieurs méthodes lève une erreur.
+- [x] Une route sans `#[Operation]` est absente, même dans le préfixe ; une route annotée hors préfixe aussi.
+- [x] `{id}` donne un paramètre path required de type string, qu'un `#[Parameter(name: 'id', type: 'integer')]` remplace.
+- [x] Un `operationId` explicite sur une route à plusieurs méthodes lève une erreur.
 
 **Vérification :** `vendor/bin/pest tests/Feature/OperationTest.php`, puis `toBeValidOpenapi()` en 3.0 et en 3.1
 
