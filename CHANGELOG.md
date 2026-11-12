@@ -2,7 +2,7 @@
 
 All notable changes to `laravel-openapi` will be documented in this file.
 
-## Unreleased
+## v1.0.0 - 2026-11-12
 
 First version.
 
