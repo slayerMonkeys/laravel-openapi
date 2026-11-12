@@ -20,6 +20,11 @@ return [
             'routes' => [
                 'prefixes' => ['api'],
             ],
+            // emitted in components.securitySchemes, keyed by name
+            'security_schemes' => [
+                // 'bearer' => ['type' => 'http', 'scheme' => 'bearer'],
+            ],
+            'security' => [], // the global requirement, e.g. [['bearer' => []]]
         ],
     ],
 

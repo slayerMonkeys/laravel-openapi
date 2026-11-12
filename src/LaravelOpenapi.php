@@ -8,9 +8,11 @@ use BIWEB\LaravelOpenapi\Attributes\Parameters;
 use BIWEB\LaravelOpenapi\Attributes\RequestBody;
 use BIWEB\LaravelOpenapi\Attributes\Response;
 use BIWEB\LaravelOpenapi\Exceptions\InvalidOpenapiDefinition;
+use BIWEB\LaravelOpenapi\OpenApi\Enums\Flow;
 use BIWEB\LaravelOpenapi\OpenApi\Enums\HttpMethod;
 use BIWEB\LaravelOpenapi\OpenApi\Enums\ParameterIn;
 use BIWEB\LaravelOpenapi\OpenApi\Enums\SchemaType;
+use BIWEB\LaravelOpenapi\OpenApi\Enums\SecuritySchemeType;
 use BIWEB\LaravelOpenapi\OpenApi\Objects;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Routing\Route;
@@ -46,9 +48,38 @@ class LaravelOpenapi
             ->openapi($version)
             ->info($this->info($config['info'] ?? []))
             ->servers(...array_map($this->server(...), $config['servers'] ?? []))
-            ->paths(...$this->paths($config['routes']['prefixes'] ?? [], $components)));
+            ->paths(...$this->paths($document, $config['routes']['prefixes'] ?? [], $components))
+            ->security(...array_map(fn (array $requirement) => $this->securityRequirement($requirement, "Document [{$document}]"), $config['security'] ?? [])));
 
-        return $openapi->components($components->toObject())->toArray($version);
+        $schemes = array_map($this->securityScheme(...), array_keys($config['security_schemes'] ?? []), array_values($config['security_schemes'] ?? []));
+        $objects = $schemes === [] ? $components->toObject() : ($components->toObject() ?? Objects\Components::create())->securitySchemes(...$schemes);
+
+        return $openapi->components($objects)->toArray($version);
+    }
+
+    /** @param  array<string, mixed>  $scheme */
+    private function securityScheme(string $name, array $scheme): Objects\SecurityScheme
+    {
+        $flows = [];
+
+        foreach ($scheme['flows'] ?? [] as $flow => $config) {
+            $flows[] = Objects\OAuthFlow::create()
+                ->flow(Flow::tryFrom($flow) ?? throw new InvalidOpenapiDefinition("Security scheme [{$name}] has an unknown flow [{$flow}]."))
+                ->authorizationUrl($config['authorizationUrl'] ?? null)
+                ->tokenUrl($config['tokenUrl'] ?? null)
+                ->refreshUrl($config['refreshUrl'] ?? null)
+                ->scopes($config['scopes'] ?? []);
+        }
+
+        return Objects\SecurityScheme::create($name)
+            ->type(SecuritySchemeType::tryFrom($scheme['type'] ?? '') ?? throw new InvalidOpenapiDefinition("Security scheme [{$name}] has an unknown type [".($scheme['type'] ?? '').'].'))
+            ->description($scheme['description'] ?? null)
+            ->name($scheme['name'] ?? null)
+            ->in(isset($scheme['in']) ? ParameterIn::tryFrom($scheme['in']) ?? throw new InvalidOpenapiDefinition("Security scheme [{$name}] has an unknown location [{$scheme['in']}].") : null)
+            ->scheme($scheme['scheme'] ?? null)
+            ->bearerFormat($scheme['bearerFormat'] ?? null)
+            ->flows(...$flows)
+            ->openIdConnectUrl($scheme['openIdConnectUrl'] ?? null);
     }
 
     /** @param  array<string, mixed>  $info */
@@ -86,7 +117,7 @@ class LaravelOpenapi
      * @param  list<string>  $prefixes
      * @return list<Objects\PathItem>
      */
-    private function paths(array $prefixes, Components $components): array
+    private function paths(string $document, array $prefixes, Components $components): array
     {
         $paths = [];
 
@@ -102,7 +133,8 @@ class LaravelOpenapi
             $source = $this->attributeSource($class, $method);
             $operation = ($source->getAttributes(Operation::class)[0] ?? null)?->newInstance();
 
-            if ($operation === null) {
+            // an empty documents list means every document
+            if ($operation === null || ($operation->documents !== [] && ! in_array($document, $operation->documents, true))) {
                 continue;
             }
 
@@ -232,7 +264,7 @@ class LaravelOpenapi
             ->deprecated($operation->deprecated ?: null);
 
         return $operation->security === [] ? $object->noSecurity() : $object->security(...array_map(
-            fn (array $requirement) => $this->securityRequirement($requirement, $label),
+            fn (array $requirement) => $this->securityRequirement($requirement, "Operation [{$label}]"),
             $operation->security ?? [],
         ));
     }
@@ -281,7 +313,7 @@ class LaravelOpenapi
     {
         // shortcut: SecurityRequirement holds one scheme, so an AND of schemes is rejected, upgrade it when one is needed
         if (count($requirement) > 1) {
-            throw new InvalidOpenapiDefinition("Operation [{$label}] has a security requirement with several schemes, which is not supported.");
+            throw new InvalidOpenapiDefinition("{$label} has a security requirement with several schemes, which is not supported.");
         }
 
         $scheme = array_key_first($requirement);
