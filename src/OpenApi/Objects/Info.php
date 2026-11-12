@@ -6,6 +6,8 @@ class Info extends BaseObject
 {
     protected const REQUIRED = ['title', 'version'];
 
+    protected const SINCE_3_1 = ['summary'];
+
     protected ?string $title = null;
 
     protected ?string $summary = null;

@@ -98,8 +98,8 @@ Vérification commune à chaque tâche : `composer test`, `composer analyse`, `v
 (`SlayerMonkey\LaravelOpenAPI\OpenAPI\{Objects,Enums}`) vers `src/OpenApi/{Objects,Enums}`, avec les corrections de
 `plan.md` : nullables explicites, propriétés initialisées, `int|float|null`, helper `with()`, pas de `__get`.
 `toArray(string $version)` est récursif. `Schema` centralise les écarts 3.0/3.1 (`nullable`, `exclusiveMinimum`/
-`exclusiveMaximum`). Les maps vides sortent en `{}`. Un champ requis manquant lève `InvalidOpenapiDefinition` avec le
-chemin de l'objet. `ref()` accepte un pointeur `#/…` ou un `class-string`, qui est stocké pour une résolution ultérieure
+`exclusiveMaximum`). Les maps vides sortent en `{}`. Un champ requis manquant, ou un champ réservé à la 3.1 utilisé en
+3.0, lève `InvalidOpenapiDefinition` avec le chemin de l'objet. `ref()` accepte un pointeur `#/…` ou un `class-string`, qui est stocké pour une résolution ultérieure
 (T8).
 
 Le travail est découpé en deux lots, un commit par lot :
