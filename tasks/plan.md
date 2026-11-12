@@ -86,7 +86,7 @@ T7 et T8 sont indépendantes une fois T6 terminée. Il en va de même pour T13 e
 - [x] T5 : modèle objet OpenAPI + sérialisation 3.0/3.1
 - [x] T6 : migration de `generate()` et `SchemaFactory` vers les objets
 - [x] T7 : paramètres optionnels → duplication des paths
-- [ ] T8 : `$ref` imbriqués, tableaux, enums, collisions (registre `Components`)
+- [x] T8 : `$ref` imbriqués, tableaux, enums, collisions (registre `Components`)
 - [ ] T9 : classes de définition + `Reusable`
 - [ ] T10 : `#[RequestBody]` / `#[Response]` / `#[Parameters]`
 
