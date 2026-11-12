@@ -69,7 +69,7 @@ it('emits a reusable response under the status code of the built object', functi
 it('registers one component per parameter of a reusable Parameters', function () {
     $components = new Components;
 
-    expect(array_map(fn ($parameter) => $parameter->toArray('3.1.0'), $components->parameters(PaginationParameters::class)))->toBe([
+    expect(array_map(fn ($parameter) => $parameter->toArray('3.1.0'), array_values($components->parameters(PaginationParameters::class))))->toBe([
         ['$ref' => '#/components/parameters/page'],
         ['$ref' => '#/components/parameters/PerPage'],
     ])->and(componentsArray($components)['parameters'])->toBe([
@@ -88,7 +88,7 @@ it('inlines a request body that is not reusable', function () {
 it('builds a valid document from definitions', function (string $version) {
     $components = new Components;
     $operation = Operation::post()
-        ->parameters(...$components->parameters(PaginationParameters::class))
+        ->parameters(...array_values($components->parameters(PaginationParameters::class)))
         ->requestBody(RequestBody::ref(CreateUserBody::class))
         ->responses(Response::ref(UserCreatedResponse::class));
 
