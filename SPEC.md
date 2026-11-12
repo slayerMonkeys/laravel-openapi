@@ -129,6 +129,10 @@ Une propriété est **required** si elle n'est pas nullable et n'a pas de valeur
 **Différences 3.0 / 3.1** gérées par le paquet :
 
 - nullable : `nullable: true` en 3.0, `type: ["string", "null"]` en 3.1 ;
+- bornes exclusives : `minimum` + `exclusiveMinimum: true` en 3.0, `exclusiveMinimum: <valeur>` en 3.1 (idem pour le
+  maximum) ;
+- champs réservés à la 3.1 (`info.summary`, `license.identifier`) : renseignés dans un document 3.0, ils lèvent une
+  erreur qui donne leur chemin ;
 - champ `openapi` : toute valeur `3.0.x` ou `3.1.x` est acceptée et recopiée telle quelle ; toute autre valeur lève une erreur.
 
 **Noms de composants** : si deux classes `#[Schema]` différentes donnent le même nom (par ex. `App\A\User` et `App\B\User`), une erreur est levée et nomme les deux classes. On la résout avec `#[Schema(name: …)]`.

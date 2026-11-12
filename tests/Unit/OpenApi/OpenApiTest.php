@@ -93,6 +93,17 @@ it('names a missing required field at the root', function () {
     OpenApi::create()->openapi('3.1.0')->toArray('3.1.0');
 })->throws(InvalidOpenapiDefinition::class, '[info] is required.');
 
+it('rejects a 3.1-only field in a 3.0 document', function (Closure $set, string $path) {
+    $info = Info::create()->title('API')->version('1.0.0');
+
+    expect($set($info)->toArray('3.1.0'))->toBeArray()
+        ->and(fn () => OpenApi::create()->openapi('3.0.3')->info($set($info))->toArray('3.0.3'))
+        ->toThrow(InvalidOpenapiDefinition::class, "[{$path}] is only available in OpenAPI 3.1, not in 3.0.3.");
+})->with([
+    'info summary' => [fn (Info $info) => $info->summary('Users'), 'info.summary'],
+    'license identifier' => [fn (Info $info) => $info->license(License::create()->name('MIT')->identifier('MIT')), 'info.license.identifier'],
+]);
+
 it('rejects an unresolved class-string reference', function () {
     Schema::object()->properties(Schema::ref(stdClass::class, 'user'))->toArray('3.1.0');
 })->throws(InvalidOpenapiDefinition::class, 'Reference [stdClass] at [properties.user] is not resolved.');

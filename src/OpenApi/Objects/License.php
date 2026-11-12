@@ -6,6 +6,8 @@ class License extends BaseObject
 {
     protected const REQUIRED = ['name'];
 
+    protected const SINCE_3_1 = ['identifier'];
+
     protected ?string $name = null;
 
     protected ?string $identifier = null;

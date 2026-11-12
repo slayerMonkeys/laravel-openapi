@@ -47,8 +47,9 @@ T7 et T8 sont indépendantes une fois T6 terminée. Il en va de même pour T13 e
     - un helper privé `with(prop, value)` remplace le copier-coller `clone` / `assign` / `return` ;
     - les getters sont explicites, à la place du `__get` magique.
 - **Sérialisation selon la version** : `BaseObject::toArray(string $version)` descend récursivement dans l'arbre. Les
-  seuls écarts 3.0/3.1 sont centralisés dans `Schema` : `nullable` et `exclusiveMinimum`/`exclusiveMaximum`. Les maps
-  vides deviennent des `stdClass`, pour sortir en `{}`.
+  seuls écarts 3.0/3.1 convertis sont centralisés dans `Schema` : `nullable` et `exclusiveMinimum`/`exclusiveMaximum`.
+  Un champ réservé à la 3.1 (`SINCE_3_1` : `Info::summary`, `License::identifier`) lève une erreur dans un document
+  3.0, au lieu d'être émis ou ignoré. Les maps vides deviennent des `stdClass`, pour sortir en `{}`.
 - **Registre `Components`** : c'est un objet par génération, jamais un état global. Il résout un `class-string` (DTO
   `#[Schema]` via `SchemaFactory`, ou classe de définition via `build()`) en objet, nomme le composant, détecte les
   collisions et ne garde que ce qui est référencé. Les `ref(Foo::class)` posés dans un `build()` sont collectés en
