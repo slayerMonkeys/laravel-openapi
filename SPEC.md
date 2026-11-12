@@ -2,7 +2,11 @@
 
 ## Objectif
 
-Générer un document **OpenAPI 3.1 ou 3.0** à partir d'une application Laravel, en se basant uniquement sur des **attributs PHP explicites** posés sur les contrôleurs et les classes de données. Le paquet est public (Packagist) et gère **plusieurs documents** par application (par ex. `public` et `internal`, ou `v1` et `v2`).
+Générer un document **OpenAPI 3.1 ou 3.0** à partir d'une application Laravel, en se basant uniquement sur des
+déclarations explicites : des **attributs PHP** posés sur les contrôleurs et les classes de données, et des **classes de
+définition** (schémas, paramètres, request bodies, réponses) qui construisent leurs objets OpenAPI avec un **builder
+objet fluent**. Le paquet est public (Packagist) et gère **plusieurs documents** par application (par ex. `public` et
+`internal`, ou `v1` et `v2`).
 
 Utilisateur cible : un développeur Laravel qui veut une spec OpenAPI fiable et versionnable, sans inférence « magique » ni annotations dans les docblocks. Le paquet doit fonctionner aussi bien avec des contrôleurs classiques qu'avec des **classes invocables** (pattern ADR, Action-Domain-Responder : une classe Action par route).
 
@@ -11,6 +15,11 @@ Utilisateur cible : un développeur Laravel qui veut une spec OpenAPI fiable et 
 1. En tant que dev, j'annote une action de contrôleur avec `#[Operation]`, `#[Response]`, etc., puis je lance `php artisan openapi:generate` et j'obtiens un `openapi.json` (ou `.yaml`) valide.
 1. bis. En tant que dev ADR, j'annote directement ma classe Action invocable (`Route::get('/users/{id}', ShowUserAction::class)`), sur la classe ou sur `__invoke`, et l'opération est documentée de la même façon.
 2. En tant que dev, j'annote un DTO ou une Resource avec `#[Schema]` et ses propriétés avec `#[Property]` ; il apparaît dans `components/schemas` et il est référencé par `$ref`.
+2. bis. En tant que dev, je génère une classe avec `php artisan make:openapi-response UserCreated` (ou `-schema`,
+   `-parameters`, `-request-body`). Dans sa méthode `build()`, je construis l'objet avec le builder
+   (`Response::created()->description(…)->content(MediaType::json()->schema(Schema::ref(UserData::class)))`), puis je la
+   référence depuis un attribut : `#[Response(UserCreatedResponse::class)]`. Si la classe implémente `Reusable`, elle va
+   dans `components` et l'opération la référence par `$ref`. Sinon, elle est insérée en ligne.
 3. En tant que dev, je déclare dans la config plusieurs documents, chacun avec sa version OpenAPI, ses infos, ses serveurs, ses préfixes de routes et ses `securitySchemes`.
 4. En tant que consommateur de l'API, je récupère via une route HTTP le document produit par la commande, si le dev a activé cette route.
 
@@ -19,10 +28,16 @@ Utilisateur cible : un développeur Laravel qui veut une spec OpenAPI fiable et 
 - Inférence depuis les FormRequest, les règles de validation, les types de retour ou les API Resources.
 - UI de documentation (Swagger UI, Scalar, Redoc).
 - Validation des requêtes et réponses à l'exécution, et assertions de test.
-- `oneOf`/`anyOf`/`allOf`, `discriminator`, webhooks, callbacks, links, `examples` multiples.
+- Attributs dédiés à `oneOf`/`anyOf`/`allOf`, `discriminator`, links et `examples` multiples. Ces constructions restent
+  disponibles **via le builder objet**, dans une classe de définition.
+- Webhooks, callbacks, extensions `x-*` par attribut, et classes de définition pour les `securitySchemes` (ils restent
+  déclarés dans la config).
 - Génération du document à la volée dans la route HTTP : elle sert uniquement le fichier produit par la commande.
 - Routes définies par closure : elles ne peuvent pas porter d'attributs et sont ignorées.
-- Attributs posés sur une classe Responder ADR : seule la classe Action (celle de la route) est lue.
+- Attributs posés sur une classe Responder ADR : seule la classe Action (celle de la route) est lue. Pour partager une
+  réponse entre plusieurs Actions, on utilise une classe `Response` réutilisable.
+- Découverte des composants par scan de répertoires (le `locations` de l'ancien paquet) : seuls les composants
+  **référencés** par une opération ou par un autre composant sont émis.
 
 ## Tech Stack
 
@@ -35,18 +50,65 @@ Utilisateur cible : un développeur Laravel qui veut une spec OpenAPI fiable et 
 
 ### Attributs (`BIWEB\LaravelOpenapi\Attributes\`)
 
-| Attribut | Cible | Rôle |
-|---|---|---|
-| `Operation(summary, description, operationId, tags, deprecated, security, documents)` | méthode ou classe invocable | **Opt-in** : seules les routes dont l'action porte cet attribut sont documentées. `documents` (liste de noms, vide = tous) restreint l'opération à certains documents. |
-| `Parameter(name, in, type, format, required, description)` | méthode ou classe invocable, répétable | Paramètre `query` / `header` / `path` / `cookie`. |
-| `RequestBody(schema, contentType = 'application/json', required = true, description)` | méthode ou classe invocable | `schema` : un `class-string` portant `#[Schema]`. |
-| `Response(status, description, schema = null, contentType = 'application/json', isList = false)` | méthode ou classe invocable, répétable | `isList: true` donne `{type: array, items: $ref}`. Une `JsonResource` est enveloppée (voir ci-dessous). |
-| `Schema(name = null, description = null)` | classe | Composant `components/schemas/{name ?? short class name}`. |
-| `Property(name, type, format, description, nullable, required, example, items)` | propriété (y compris promue), ou classe (répétable) | Sur une propriété, les arguments surchargent ce qui est déduit du type PHP natif et `name` est ignoré. Sur la classe, `name` et `type` sont obligatoires (voir ci-dessous). |
+| Attribut                                                                                         | Cible                                               | Rôle                                                                                                                                                                                                                                                                                         |
+|--------------------------------------------------------------------------------------------------|-----------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `Operation(summary, description, operationId, tags, deprecated, security, documents)`            | méthode ou classe invocable                         | **Opt-in** : seules les routes dont l'action porte cet attribut sont documentées. `documents` (liste de noms, vide = tous) restreint l'opération à certains documents.                                                                                                                       |
+| `Parameter(name, in, type, format, required, description)`                                       | méthode ou classe invocable, répétable              | Paramètre `query` / `header` / `path` / `cookie`.                                                                                                                                                                                                                                            |
+| `RequestBody(body, contentType = 'application/json', required = true, description)`              | méthode ou classe invocable                         | `body` : une classe `RequestBody` de définition, ou un **schéma** (classe `#[Schema]` ou classe `Schema` de définition).                                                                                                                                                                     |
+| `Response(status, description, schema = null, contentType = 'application/json', isList = false)` | méthode ou classe invocable, répétable              | `status` : un code HTTP, ou une classe `Response` de définition (les autres arguments sont alors interdits). `schema` : une classe `#[Schema]` ou une classe `Schema` de définition. `isList: true` donne `{type: array, items: $ref}`. Une `JsonResource` est enveloppée (voir ci-dessous). |
+| `Parameters(...classes)`                                                                         | méthode ou classe invocable, répétable              | Une ou plusieurs classes `Parameters` de définition. Leurs paramètres s'ajoutent à ceux de `#[Parameter]`, avec la même règle d'unicité `in` + `name`.                                                                                                                                       |
+| `Schema(name = null, description = null)`                                                        | classe                                              | Composant `components/schemas/{name ?? short class name}`.                                                                                                                                                                                                                                   |
+| `Property(name, type, format, description, nullable, required, example, items)`                  | propriété (y compris promue), ou classe (répétable) | Sur une propriété, les arguments surchargent ce qui est déduit du type PHP natif et `name` est ignoré. Sur la classe, `name` et `type` sont obligatoires (voir ci-dessous).                                                                                                                  |
 
 **Classes invocables (ADR)** : Laravel résout `Route::get(…, ShowUserAction::class)` en `ShowUserAction@__invoke` (`RouteAction::makeInvokable`). Pour une action `__invoke`, les attributs d'opération peuvent être posés **sur la classe ou sur `__invoke`, mais pas sur les deux**. Une opération répartie sur les deux lève une erreur qui nomme la classe. Sur un contrôleur classique (action autre que `__invoke`), les attributs d'opération posés sur la classe sont ignorés.
 
 **Paramètres de chemin** : les segments `{id}` de l'URI sont ajoutés automatiquement (`in: path`, `required: true`, `type: string`), sauf si un `#[Parameter]` du même nom les redéfinit.
+
+**Paramètres optionnels** : OpenAPI ne connaît pas de segment optionnel, et Laravel n'en autorise qu'en fin d'URI. Une
+route avec *n* segments `{x?}` est donc **dupliquée en *n* + 1 paths** : `/posts/{post}/comments/{comment?}` donne
+`/posts/{post}/comments` et `/posts/{post}/comments/{comment}`. Chaque variante ne contient que ses propres paramètres
+de chemin, qui sont tous required. Un `operationId` explicite reçoit un suffixe par variante (`listComments`, puis
+`listCommentsByComment`), pour rester unique.
+
+## Builder objet et classes de définition
+
+**Modèle objet** (`BIWEB\LaravelOpenapi\OpenApi\Objects\`) : le document est un arbre d'objets **immuables et fluents**,
+porté de l'ancien paquet et corrigé. Chaque setter renvoie un clone. Les objets couvrent `OpenApi`, `Info`, `Contact`,
+`License`, `Server`, `ServerVariable`, `Tag`, `ExternalDocs`, `PathItem`, `Operation`, `Parameter`, `RequestBody`,
+`MediaType`, `Encoding`, `Response`, `Header`, `Link`, `Example`, `Schema`, `AllOf`, `AnyOf`, `OneOf`, `Not`,
+`Discriminator`, `Xml`, `Components`, `SecurityScheme`, `SecurityRequirement` et `OAuthFlow`. Les énumérations
+(`SchemaType`, `SchemaFormat`, `ParameterIn`, `Style`, `HttpMethod`, `SecuritySchemeType`, `Flow`) sont des backed
+enums.
+
+- Les objets décrivent une **intention**, indépendante de la version. La sérialisation `toArray(string $version)`
+  produit la forme 3.0 ou 3.1 (par exemple `->nullable()` donne `nullable: true` ou `type: [T, "null"]`).
+- Les maps vides sont émises en `{}`, les clés nulles ou vides sont omises, les extensions `x-*` sont gérées par
+  `->x(key, value)`.
+- Un champ requis manquant lève `InvalidOpenapiDefinition`, avec le chemin de l'objet fautif (par exemple
+  `paths./users.get.responses`).
+- `Schema::ref()`, `Response::ref()`, etc. acceptent un `class-string` de définition ou de `#[Schema]`, résolu en
+  `#/components/...` au moment de la génération, ou un pointeur `#/...` brut.
+
+**Classes de définition** (`BIWEB\LaravelOpenapi\Definitions\`) : ce sont des classes abstraites que l'application
+étend, résolues par le container (injection possible dans le constructeur).
+
+| Classe        | `build()` renvoie                                                                                            | Composant si `Reusable`                              |
+|---------------|--------------------------------------------------------------------------------------------------------------|------------------------------------------------------|
+| `Schema`      | `Objects\Schema` ou une composition `AllOf`/`AnyOf`/`OneOf`/`Not`                                            | `components.schemas`                                 |
+| `Parameters`  | `list<Objects\Parameter>`                                                                                    | `components.parameters` (un composant par paramètre) |
+| `RequestBody` | `Objects\RequestBody`                                                                                        | `components.requestBodies`                           |
+| `Response`    | `Objects\Response` (le code HTTP est porté par l'objet : `Response::ok()`, `::created()`, `->statusCode(…)`) | `components.responses`                               |
+
+- **`Reusable`** (interface marqueur) : la classe va dans `components` et l'opération la référence par `$ref`. Sans
+  `Reusable`, l'objet est inséré en ligne.
+- **Nom du composant** : l'`objectId` passé au builder (`Schema::object('User')`), sinon le nom court de la classe. La
+  règle de collision est la même que pour `#[Schema]`.
+- **Mélange** : dans `build()`, `Schema::ref(UserData::class)` peut viser un DTO `#[Schema]`, et une
+  `#[Property(items: UserSchema::class)]` peut viser une classe `Schema` de définition. Les deux mondes produisent le
+  même modèle objet.
+- **Commandes `make:openapi-schema`, `-parameters`, `-request-body`, `-response`** : elles génèrent la classe dans
+  `app/OpenApi/{Schemas,Parameters,RequestBodies,Responses}` à partir de stubs publiables. L'option `--reusable` ajoute
+  `implements Reusable`.
 
 **Déduction des types d'une propriété `#[Schema]`** (seule déduction faite par le paquet, et toujours surchargeable) :
 
@@ -125,11 +187,17 @@ composer format                                 # pint
 ```
 config/openapi.php                  → config multi-documents
 routes/openapi.php                  → routes servant les fichiers des documents (chargées via hasRoute)
-src/Attributes/*.php                → Operation, Parameter, RequestBody, Response, Schema, Property
-src/LaravelOpenapi.php              → generate() : routes → paths + components
-src/SchemaFactory.php               → classe #[Schema] → schéma (gère 3.0/3.1, collecte les composants)
+src/Attributes/*.php                → Operation, Parameter, Parameters, RequestBody, Response, Schema, Property
+src/OpenApi/Objects/*.php           → modèle objet fluent et immuable (builder)
+src/OpenApi/Enums/*.php             → SchemaType, SchemaFormat, ParameterIn, HttpMethod…
+src/Definitions/*.php               → Schema, Parameters, RequestBody, Response (abstraites) + Reusable
+src/LaravelOpenapi.php              → generate() : routes → arbre OpenApi → toArray($version)
+src/SchemaFactory.php               → classe #[Schema] → Objects\Schema
+src/Components.php                  → registre des composants référencés (résolution des class-string, collisions)
 src/Http/OpenapiController.php      → contrôleur invocable qui sert le fichier `output`
 src/Commands/GenerateCommand.php    → openapi:generate (remplace LaravelOpenapiCommand)
+src/Commands/Make*Command.php       → make:openapi-schema|parameters|request-body|response
+stubs/*.stub                        → stubs publiables des classes de définition
 src/Facades/LaravelOpenapi.php      → façade existante
 tests/Fixtures/                     → contrôleurs, DTO et enums annotés servant de fixtures
 tests/Fixtures/expected/*.json      → documents attendus (3.0 et 3.1)
@@ -198,12 +266,37 @@ final class UserResource extends JsonResource
 }
 ```
 
-Le document est construit sous forme de **tableaux PHP**, sans arbre d'objets OpenAPI intermédiaire. Les clés vides ou nulles sont omises de la sortie.
+Classe de définition équivalente, réutilisable :
+
+```php
+final class UserCreatedResponse extends Response implements Reusable
+{
+    public function build(): Objects\Response
+    {
+        return Objects\Response::created('UserCreated')
+            ->description('Utilisateur créé')
+            ->content(MediaType::json()->schema(Schema::ref(UserData::class)));
+    }
+}
+
+#[Operation(summary: 'Créer un utilisateur', tags: ['users'])]
+#[RequestBody(CreateUserBody::class)]
+#[Response(UserCreatedResponse::class)]   // → responses.201 = {$ref: '#/components/responses/UserCreated'}
+#[Response(422, 'Erreur de validation')]
+final class CreateUserAction { /* … */ }
+```
+
+Le document est construit sous forme d'**arbre d'objets OpenAPI**, attributs et classes de définition confondus, puis
+sérialisé selon la version du document. Les clés vides ou nulles sont omises de la sortie.
 
 ## Stratégie de test
 
 - **Pest + Testbench** ; `TestCase` enregistre le provider et définit les routes de fixtures dans `defineRoutes()`.
 - **Feature (le cœur)** : une app de fixtures couvrant toutes les fonctionnalités est générée en 3.0 et en 3.1. Chaque document est **validé contre le méta-schéma officiel** de sa version, puis comparé à `tests/Fixtures/expected/*.json` (`toEqual` sur les tableaux décodés). Les fixtures incluent un contrôleur classique et des Actions invocables, annotées sur la classe pour l'une et sur `__invoke` pour l'autre.
+- **Unit, modèle objet** : un test par objet (construction, immutabilité, `toArray` en 3.0 et en 3.1, champ requis
+  manquant).
+- **Unit, classes de définition** : inline ou `$ref` selon `Reusable`, nom du composant, mélange `#[Schema]` et
+  définition, collision.
 - **Unit** : table de déduction des types (y compris enum et nullable dans les deux versions), règle `required`, propriétés déclarées sur la classe (`JsonResource`), erreurs (`items` absent, classe sans `#[Schema]`, collision de noms de composants, attributs à la fois sur la classe et sur `__invoke`, version `openapi` invalide).
 - **Commande** : écriture JSON et YAML (le YAML relu par `Yaml::parse` doit être égal au JSON), `--all`, document inconnu → code de sortie non nul.
 - **Route** : désactivée → 404 ; activée sans fichier → 404 ; activée avec un fichier → 200 avec son contenu et le bon `Content-Type` (JSON et YAML) ; middleware appliqué.
@@ -226,6 +319,10 @@ Le document est construit sous forme de **tableaux PHP**, sans arbre d'objets Op
 5. Les `securitySchemes` de la config sont présents dans `components`, et le `security` d'une `#[Operation]` est repris tel quel.
 6. Les erreurs de configuration ou d'annotation produisent un message qui nomme la classe ou la méthode fautive.
 7. `composer test`, `composer analyse` et `composer format --test` passent sur toute la matrice CI.
+8. Une réponse, un request body, un schéma ou des paramètres déclarés par une classe de définition produisent la même
+   sortie que leur équivalent par attributs. Avec `Reusable`, ils sont dans `components` et référencés par `$ref`, sans
+   `Reusable` ils sont insérés en ligne.
+9. Une route `{x?}` produit les deux paths attendus, valides et avec des `operationId` uniques.
 
 ## Décisions (revue du 2026-11-11)
 
@@ -236,6 +333,13 @@ Le document est construit sous forme de **tableaux PHP**, sans arbre d'objets Op
 5. Une collision de noms de composants lève une erreur.
 6. Les attributs d'opération sont compatibles avec les classes invocables (ADR).
 7. (2026-11-12) Les API Resources et les modèles sont documentés par des `#[Property(name:, type:)]` répétés sur la classe, sans lecture de `toArray()`. Les réponses `JsonResource` suivent l'enveloppe `$wrap`.
+8. (2026-11-12) **Retour du modèle objet** : la décision « tableaux PHP sans modèle objet » est abandonnée. On garde le
+   builder objet fluent de l'ancien paquet (corrigé : nullables explicites, `int|float`, pas de `__get` magique) et ses
+   classes de définition `Schema` / `Parameters` / `RequestBody` / `Response` avec `build()`. Les attributs et les
+   classes de définition produisent le même arbre d'objets.
+9. (2026-11-12) Les segments optionnels `{x?}` sont **dupliqués** en plusieurs paths, au lieu d'être rendus
+   obligatoires.
+10. (2026-11-12) Les composants sont émis à la demande (référencés uniquement), sans scan de répertoires.
 
 ## Questions ouvertes
 
