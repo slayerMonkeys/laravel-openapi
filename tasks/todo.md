@@ -111,11 +111,11 @@ Le travail est découpé en deux lots, un commit par lot :
 
 **Critères d'acceptation :**
 
-- [ ] Chaque objet a un test : construction, immutabilité (le setter ne modifie pas l'original), `toArray` en 3.0 et en
+- [x] Chaque objet a un test : construction, immutabilité (le setter ne modifie pas l'original), `toArray` en 3.0 et en
   3.1.
-- [ ] `Schema::string()->nullable()` donne `{type: string, nullable: true}` en 3.0 et `{type: [string, null]}` en 3.1.
-- [ ] Un document complet construit à la main avec le builder passe `toBeValidOpenapi()` en 3.0 et en 3.1.
-- [ ] Aucune signature implicitement nullable (vérifiée par PHPStan, avec les règles de dépréciation).
+- [x] `Schema::string()->nullable()` donne `{type: string, nullable: true}` en 3.0 et `{type: [string, null]}` en 3.1.
+- [x] Un document complet construit à la main avec le builder passe `toBeValidOpenapi()` en 3.0 et en 3.1.
+- [x] Aucune signature implicitement nullable (vérifiée par PHPStan, avec les règles de dépréciation).
 
 **Vérification :** `vendor/bin/pest tests/Unit/OpenApi`
 

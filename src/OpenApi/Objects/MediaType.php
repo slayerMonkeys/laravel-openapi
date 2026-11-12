@@ -13,6 +13,12 @@ class MediaType extends BaseObject
 
     protected mixed $example = null;
 
+    /** @var list<Example>|null */
+    protected ?array $examples = null;
+
+    /** @var list<Encoding>|null */
+    protected ?array $encoding = null;
+
     public static function json(?string $objectId = null): static
     {
         return static::create($objectId)->mediaType('application/json');
@@ -78,8 +84,23 @@ class MediaType extends BaseObject
         return $this->with('example', $example);
     }
 
+    public function examples(Example ...$examples): static
+    {
+        return $this->with('examples', $examples ?: null);
+    }
+
+    public function encoding(Encoding ...$encoding): static
+    {
+        return $this->with('encoding', $encoding ?: null);
+    }
+
     protected function fields(string $version): array
     {
-        return ['schema' => $this->schema, 'example' => $this->example];
+        return [
+            'schema' => $this->schema,
+            'example' => $this->example,
+            'examples' => self::keyBy($this->examples, fn (Example $example) => $example->getObjectId()),
+            'encoding' => self::keyBy($this->encoding, fn (Encoding $encoding) => $encoding->getObjectId()),
+        ];
     }
 }
