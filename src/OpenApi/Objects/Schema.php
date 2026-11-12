@@ -62,9 +62,15 @@ class Schema extends BaseObject implements SchemaContract
 
     protected ?int $minProperties = null;
 
+    protected ?Discriminator $discriminator = null;
+
     protected ?bool $readOnly = null;
 
     protected ?bool $writeOnly = null;
+
+    protected ?Xml $xml = null;
+
+    protected ?ExternalDocs $externalDocs = null;
 
     protected mixed $example = null;
 
@@ -225,6 +231,11 @@ class Schema extends BaseObject implements SchemaContract
         return $this->with('minProperties', $minProperties);
     }
 
+    public function discriminator(?Discriminator $discriminator): static
+    {
+        return $this->with('discriminator', $discriminator);
+    }
+
     public function readOnly(?bool $readOnly = true): static
     {
         return $this->with('readOnly', $readOnly);
@@ -233,6 +244,16 @@ class Schema extends BaseObject implements SchemaContract
     public function writeOnly(?bool $writeOnly = true): static
     {
         return $this->with('writeOnly', $writeOnly);
+    }
+
+    public function xml(?Xml $xml): static
+    {
+        return $this->with('xml', $xml);
+    }
+
+    public function externalDocs(?ExternalDocs $externalDocs): static
+    {
+        return $this->with('externalDocs', $externalDocs);
     }
 
     public function example(mixed $example): static

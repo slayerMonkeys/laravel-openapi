@@ -26,6 +26,8 @@ class OpenApi extends BaseObject
     /** @var list<Tag>|null */
     protected ?array $tags = null;
 
+    protected ?ExternalDocs $externalDocs = null;
+
     public function openapi(?string $openapi): static
     {
         return $this->with('openapi', $openapi);
@@ -59,6 +61,11 @@ class OpenApi extends BaseObject
     public function tags(Tag ...$tags): static
     {
         return $this->with('tags', $tags ?: null);
+    }
+
+    public function externalDocs(?ExternalDocs $externalDocs): static
+    {
+        return $this->with('externalDocs', $externalDocs);
     }
 
     protected function fields(string $version): array

@@ -16,6 +16,8 @@ class Operation extends BaseObject
 
     protected ?string $description = null;
 
+    protected ?ExternalDocs $externalDocs = null;
+
     protected ?string $operationId = null;
 
     /** @var list<Parameter>|null */
@@ -97,6 +99,11 @@ class Operation extends BaseObject
     public function description(?string $description): static
     {
         return $this->with('description', $description);
+    }
+
+    public function externalDocs(?ExternalDocs $externalDocs): static
+    {
+        return $this->with('externalDocs', $externalDocs);
     }
 
     public function operationId(?string $operationId): static
