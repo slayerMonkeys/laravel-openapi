@@ -1,10 +1,24 @@
 <?php
 
 use BIWEB\LaravelOpenapi\Exceptions\InvalidOpenapiDefinition;
+use BIWEB\LaravelOpenapi\OpenApi\Enums\Flow;
 use BIWEB\LaravelOpenapi\OpenApi\Enums\SchemaFormat;
+use BIWEB\LaravelOpenapi\OpenApi\Enums\SecuritySchemeType;
+use BIWEB\LaravelOpenapi\OpenApi\Objects\AllOf;
 use BIWEB\LaravelOpenapi\OpenApi\Objects\Components;
+use BIWEB\LaravelOpenapi\OpenApi\Objects\Contact;
+use BIWEB\LaravelOpenapi\OpenApi\Objects\Discriminator;
+use BIWEB\LaravelOpenapi\OpenApi\Objects\Encoding;
+use BIWEB\LaravelOpenapi\OpenApi\Objects\Example;
+use BIWEB\LaravelOpenapi\OpenApi\Objects\ExternalDocs;
+use BIWEB\LaravelOpenapi\OpenApi\Objects\Header;
 use BIWEB\LaravelOpenapi\OpenApi\Objects\Info;
+use BIWEB\LaravelOpenapi\OpenApi\Objects\License;
+use BIWEB\LaravelOpenapi\OpenApi\Objects\Link;
 use BIWEB\LaravelOpenapi\OpenApi\Objects\MediaType;
+use BIWEB\LaravelOpenapi\OpenApi\Objects\Not;
+use BIWEB\LaravelOpenapi\OpenApi\Objects\OAuthFlow;
+use BIWEB\LaravelOpenapi\OpenApi\Objects\OneOf;
 use BIWEB\LaravelOpenapi\OpenApi\Objects\OpenApi;
 use BIWEB\LaravelOpenapi\OpenApi\Objects\Operation;
 use BIWEB\LaravelOpenapi\OpenApi\Objects\Parameter;
@@ -13,8 +27,11 @@ use BIWEB\LaravelOpenapi\OpenApi\Objects\RequestBody;
 use BIWEB\LaravelOpenapi\OpenApi\Objects\Response;
 use BIWEB\LaravelOpenapi\OpenApi\Objects\Schema;
 use BIWEB\LaravelOpenapi\OpenApi\Objects\SecurityRequirement;
+use BIWEB\LaravelOpenapi\OpenApi\Objects\SecurityScheme;
 use BIWEB\LaravelOpenapi\OpenApi\Objects\Server;
+use BIWEB\LaravelOpenapi\OpenApi\Objects\ServerVariable;
 use BIWEB\LaravelOpenapi\OpenApi\Objects\Tag;
+use BIWEB\LaravelOpenapi\OpenApi\Objects\Xml;
 
 function document(string $version, Response ...$responses): OpenApi
 {
@@ -22,21 +39,46 @@ function document(string $version, Response ...$responses): OpenApi
 
     return OpenApi::create()
         ->openapi($version)
-        ->info(Info::create()->title('API')->description('Users API')->version('1.0.0'))
-        ->servers(Server::create()->url('https://api.example.com'))
+        ->info(Info::create()->title('API')->description('Users API')->version('1.0.0')
+            ->contact(Contact::create()->name('Support')->email('support@example.com'))
+            ->license(License::create()->name('MIT')->url('https://opensource.org/licenses/MIT')))
+        ->servers(Server::create()->url('https://{region}.example.com')->variables(ServerVariable::create('region')->enum('eu', 'us')->default('eu')))
         ->paths(PathItem::create()->route('/users/{id}')->operations(
             Operation::get()->tags('users')->operationId('showUser')
                 ->parameters(Parameter::path()->name('id')->required()->schema(Schema::integer()->format(SchemaFormat::INT64)))
-                ->responses(...$responses ?: [Response::ok()->content(MediaType::json()->schema($user)), Response::notFound()]),
+                ->responses(...$responses ?: [
+                    Response::ok()
+                        ->headers(Header::create('X-Rate-Limit')->schema(Schema::integer()))
+                        ->content(MediaType::json()->schema($user)->examples(Example::create('jane')->value(['id' => 1])))
+                        ->links(Link::create('self')->operationId('showUser')),
+                    Response::notFound(),
+                ]),
             Operation::put()->noSecurity()
-                ->requestBody(RequestBody::create()->required()->content(MediaType::json()->schema($user)))
+                ->externalDocs(ExternalDocs::create()->url('https://docs.example.com/update'))
+                ->requestBody(RequestBody::create()->required()->content(
+                    MediaType::formData()->schema(Schema::object()->properties(Schema::string('avatar')->format('binary')))
+                        ->encoding(Encoding::create('avatar')->contentType('image/png')),
+                ))
                 ->responses(Response::ok()),
         ))
-        ->components(Components::create()->schemas(Schema::object('User')
-            ->properties(Schema::integer('id'), Schema::string('nickname')->nullable(), Schema::number('score')->exclusiveMinimum(0))
-            ->required('id')))
+        ->components(Components::create()
+            ->schemas(
+                Schema::object('User')
+                    ->properties(Schema::integer('id'), Schema::string('nickname')->nullable(), Schema::number('score')->exclusiveMinimum(0))
+                    ->required('id')
+                    ->xml(Xml::create()->name('user')),
+                AllOf::create('Admin')->schemas($user, Schema::object()->properties(Schema::boolean('root'))),
+                OneOf::create('Member')->schemas($user, Schema::ref('#/components/schemas/Admin')),
+                Schema::object('Animal')->properties(Schema::string('kind'), Not::create('legs')->schema(Schema::string()))
+                    ->discriminator(Discriminator::create()->propertyName('kind')->mapping(['user' => '#/components/schemas/User'])),
+            )
+            ->securitySchemes(
+                SecurityScheme::create('bearer')->type(SecuritySchemeType::HTTP)->scheme('bearer')->bearerFormat('JWT'),
+                SecurityScheme::oauth2('oauth')->flows(OAuthFlow::create()->flow(Flow::CLIENT_CREDENTIALS)->tokenUrl('https://example.com/token')->scopes(['read' => 'Read'])),
+            ))
         ->security(SecurityRequirement::create()->securityScheme('bearer'))
-        ->tags(Tag::create()->name('users'));
+        ->tags(Tag::create()->name('users')->externalDocs(ExternalDocs::create()->url('https://docs.example.com/users')))
+        ->externalDocs(ExternalDocs::create()->url('https://docs.example.com'));
 }
 
 it('builds a complete valid document', function (string $version) {

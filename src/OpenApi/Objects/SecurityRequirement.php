@@ -9,9 +9,9 @@ class SecurityRequirement extends BaseObject
     /** @var list<string> */
     protected array $scopes = [];
 
-    public function securityScheme(?string $securityScheme): static
+    public function securityScheme(SecurityScheme|string|null $securityScheme): static
     {
-        return $this->with('securityScheme', $securityScheme);
+        return $this->with('securityScheme', $securityScheme instanceof SecurityScheme ? $securityScheme->getObjectId() : $securityScheme);
     }
 
     public function scopes(string ...$scopes): static

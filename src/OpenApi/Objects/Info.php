@@ -14,6 +14,10 @@ class Info extends BaseObject
 
     protected ?string $termsOfService = null;
 
+    protected ?Contact $contact = null;
+
+    protected ?License $license = null;
+
     protected ?string $version = null;
 
     public function title(?string $title): static
@@ -34,6 +38,16 @@ class Info extends BaseObject
     public function termsOfService(?string $termsOfService): static
     {
         return $this->with('termsOfService', $termsOfService);
+    }
+
+    public function contact(?Contact $contact): static
+    {
+        return $this->with('contact', $contact);
+    }
+
+    public function license(?License $license): static
+    {
+        return $this->with('license', $license);
     }
 
     public function version(?string $version): static

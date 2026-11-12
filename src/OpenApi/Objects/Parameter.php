@@ -32,6 +32,9 @@ class Parameter extends BaseObject
 
     protected mixed $example = null;
 
+    /** @var list<Example>|null */
+    protected ?array $examples = null;
+
     /** @var list<MediaType>|null */
     protected ?array $content = null;
 
@@ -110,6 +113,11 @@ class Parameter extends BaseObject
         return $this->with('example', $example);
     }
 
+    public function examples(Example ...$examples): static
+    {
+        return $this->with('examples', $examples ?: null);
+    }
+
     public function content(MediaType ...$content): static
     {
         return $this->with('content', $content ?: null);
@@ -119,6 +127,7 @@ class Parameter extends BaseObject
     {
         return [
             ...parent::fields($version),
+            'examples' => self::keyBy($this->examples, fn (Example $example) => $example->getObjectId()),
             'content' => self::keyBy($this->content, fn (MediaType $mediaType) => $mediaType->getMediaType()),
         ];
     }

@@ -11,8 +11,14 @@ class Response extends BaseObject
 
     protected ?string $description = null;
 
+    /** @var list<Header>|null */
+    protected ?array $headers = null;
+
     /** @var list<MediaType>|null */
     protected ?array $content = null;
+
+    /** @var list<Link>|null */
+    protected ?array $links = null;
 
     public static function ok(?string $objectId = null): static
     {
@@ -84,16 +90,28 @@ class Response extends BaseObject
         return $this->with('description', $description);
     }
 
+    public function headers(Header ...$headers): static
+    {
+        return $this->with('headers', $headers ?: null);
+    }
+
     public function content(MediaType ...$content): static
     {
         return $this->with('content', $content ?: null);
+    }
+
+    public function links(Link ...$links): static
+    {
+        return $this->with('links', $links ?: null);
     }
 
     protected function fields(string $version): array
     {
         return [
             'description' => $this->description,
+            'headers' => self::keyBy($this->headers, fn (Header $header) => $header->getObjectId()),
             'content' => self::keyBy($this->content, fn (MediaType $mediaType) => $mediaType->getMediaType()),
+            'links' => self::keyBy($this->links, fn (Link $link) => $link->getObjectId()),
         ];
     }
 }
