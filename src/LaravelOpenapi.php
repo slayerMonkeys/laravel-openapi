@@ -104,11 +104,10 @@ class LaravelOpenapi
                 throw new InvalidOpenapiDefinition("Operation [{$class}@{$method->name}] has an operationId but matches several HTTP methods.");
             }
 
-            // OpenAPI has no optional path segments: {id?} becomes {id}
-            $path = '/'.ltrim(str_replace('?}', '}', $route->uri()), '/');
-
-            foreach ($verbs as $verb) {
-                $paths[$path][] = $this->operation($operation, $source, $route)->method(HttpMethod::from($verb));
+            foreach (PathExpander::expand($route->uri()) as $path => $optional) {
+                foreach ($verbs as $verb) {
+                    $paths[$path][] = $this->operation($operation, $source, $route, $path, $optional)->method(HttpMethod::from($verb));
+                }
             }
         }
 
@@ -164,22 +163,31 @@ class LaravelOpenapi
         return false;
     }
 
-    /** @param  ReflectionClass<object>|ReflectionMethod  $source */
-    private function operation(Operation $operation, ReflectionClass|ReflectionMethod $source, Route $route): Objects\Operation
+    /**
+     * @param  ReflectionClass<object>|ReflectionMethod  $source
+     * @param  list<string>  $optional  the optional parameters present in this variant of the path
+     */
+    private function operation(Operation $operation, ReflectionClass|ReflectionMethod $source, Route $route, string $path, array $optional): Objects\Operation
     {
-        preg_match_all('/\{(\w+)\??\}/', $route->uri(), $matches);
+        preg_match_all('/\{(\w+)\??\}/', $route->uri(), $uri);
+        preg_match_all('/\{(\w+)\}/', $path, $variant);
         $label = $source instanceof ReflectionMethod ? "{$source->class}@{$source->name}" : $source->name;
 
         // keyed by in + name, the pair OpenAPI requires to be unique, so an explicit #[Parameter] replaces the implicit one
         $parameters = [];
 
-        foreach ($matches[1] as $name) {
+        foreach ($variant[1] as $name) {
             $parameters["path.{$name}"] = Objects\Parameter::path()->name($name)->required()->schema(Objects\Schema::string());
         }
 
         foreach ($source->getAttributes(Parameter::class) as $attribute) {
             $parameter = $attribute->newInstance();
-            $in = $parameter->in ?? (in_array($parameter->name, $matches[1], true) ? 'path' : 'query');
+            $in = $parameter->in ?? (in_array($parameter->name, $uri[1], true) ? 'path' : 'query');
+
+            // an optional path parameter only belongs to the variants that contain it
+            if ($in === 'path' && in_array($parameter->name, $uri[1], true) && ! in_array($parameter->name, $variant[1], true)) {
+                continue;
+            }
 
             $parameters["{$in}.{$parameter->name}"] = Objects\Parameter::create()
                 ->name($parameter->name)
@@ -195,7 +203,8 @@ class LaravelOpenapi
             ->tags(...$operation->tags)
             ->summary($operation->summary)
             ->description($operation->description)
-            ->operationId($operation->operationId)
+            // each variant of an optional path needs its own operationId: listComments, listCommentsByComment
+            ->operationId($operation->operationId === null ? null : $operation->operationId.implode('', array_map(fn (string $name) => 'By'.Str::studly($name), $optional)))
             ->parameters(...array_values($parameters))
             ->deprecated($operation->deprecated ?: null);
 

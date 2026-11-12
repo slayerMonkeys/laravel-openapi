@@ -157,10 +157,10 @@ reçoit le suffixe `By{Param}`.
 
 **Critères d'acceptation :**
 
-- [ ] `/posts/{post}/comments/{comment?}` donne `/posts/{post}/comments` (paramètre `post`) et
+- [x] `/posts/{post}/comments/{comment?}` donne `/posts/{post}/comments` (paramètre `post`) et
   `/posts/{post}/comments/{comment}` (paramètres `post` et `comment`).
-- [ ] `operationId: 'listComments'` donne `listComments` et `listCommentsByComment`.
-- [ ] Le document reste valide (pas de paramètre de chemin absent de l'URI, ni d'`operationId` dupliqué).
+- [x] `operationId: 'listComments'` donne `listComments` et `listCommentsByComment`.
+- [x] Le document reste valide (pas de paramètre de chemin absent de l'URI, ni d'`operationId` dupliqué).
 
 **Vérification :** `vendor/bin/pest tests/Feature/OptionalParameterTest.php`
 
