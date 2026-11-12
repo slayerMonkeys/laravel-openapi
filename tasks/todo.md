@@ -276,10 +276,10 @@ propres préfixes. Les `security_schemes` de la config (tableaux) sont convertis
 
 **Critères d'acceptation :**
 
-- [ ] Deux documents (`public` sur `api`, `internal` sur `internal`) ne contiennent chacun que leurs routes **et leurs
+- [x] Deux documents (`public` sur `api`, `internal` sur `internal`) ne contiennent chacun que leurs routes **et leurs
   composants**.
-- [ ] Une opération avec `documents: ['internal']` est absente de `public`.
-- [ ] Les `securitySchemes` et le `security` global sont présents, et le document reste valide.
+- [x] Une opération avec `documents: ['internal']` est absente de `public`.
+- [x] Les `securitySchemes` et le `security` global sont présents, et le document reste valide.
 
 **Vérification :** `vendor/bin/pest tests/Feature/MultiDocumentTest.php`
 
