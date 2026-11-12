@@ -22,6 +22,7 @@ class LaravelOpenapiServiceProvider extends PackageServiceProvider
         $package
             ->name('laravel-openapi')
             ->hasConfigFile()
+            ->hasRoute('openapi')
             ->hasCommands(GenerateCommand::class, MakeSchemaCommand::class, MakeParametersCommand::class, MakeRequestBodyCommand::class, MakeResponseCommand::class);
     }
 
