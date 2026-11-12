@@ -16,6 +16,10 @@ return [
             'servers' => [
                 // ['url' => 'https://api.example.com'],
             ],
+            // only routes whose URI starts with one of these prefixes are documented
+            'routes' => [
+                'prefixes' => ['api'],
+            ],
         ],
     ],
 
