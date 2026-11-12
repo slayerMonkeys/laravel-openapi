@@ -1,10 +1,13 @@
 {
     "name": "biweb/laravel-openapi",
-    "description": "This is my package laravel-openapi",
+    "description": "Generate OpenAPI 3.0 and 3.1 documents from PHP attributes and definition classes in Laravel",
     "keywords": [
         "biweb",
         "laravel",
-        "laravel-openapi"
+        "laravel-openapi",
+        "openapi",
+        "swagger",
+        "documentation"
     ],
     "homepage": "https://github.com/slayerMonkeys/laravel-openapi",
     "license": "MIT",
@@ -42,8 +45,7 @@
     },
     "autoload-dev": {
         "psr-4": {
-            "BIWEB\\LaravelOpenapi\\Tests\\": "tests/",
-            "Workbench\\App\\": "workbench/app/"
+            "BIWEB\\LaravelOpenapi\\Tests\\": "tests/"
         }
     },
     "scripts": {

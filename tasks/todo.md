@@ -365,10 +365,10 @@ jour, et une entrée est ajoutée dans `CHANGELOG.md`.
 
 **Critères d'acceptation :**
 
-- [ ] Les exemples du README correspondent aux fixtures testées.
-- [ ] `CLAUDE.md` décrit l'architecture réelle (modèle objet, `Components`, `SchemaFactory`, définitions, commandes,
+- [x] Les exemples du README correspondent aux fixtures testées.
+- [x] `CLAUDE.md` décrit l'architecture réelle (modèle objet, `Components`, `SchemaFactory`, définitions, commandes,
   route).
-- [ ] Il ne reste plus aucun placeholder du skeleton.
+- [x] Il ne reste plus aucun placeholder du skeleton.
 
 **Vérification :** relecture humaine ; `grep -r "This is my package\|My command"` ne renvoie rien
 
@@ -383,5 +383,5 @@ jour, et une entrée est ajoutée dans `CHANGELOG.md`.
 ### Checkpoint final
 
 - [ ] Les 9 critères de succès de `SPEC.md` sont remplis
-- [ ] `composer test`, `composer analyse` et `vendor/bin/pint --test` passent
+- [x] `composer test`, `composer analyse` et `vendor/bin/pint --test` passent
 - [ ] Revue humaine avant merge dans `develop`
