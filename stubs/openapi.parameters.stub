@@ -1,0 +1,17 @@
+<?php
+
+namespace {{ namespace }};
+
+use BIWEB\LaravelOpenapi\Definitions\Parameters;
+use BIWEB\LaravelOpenapi\Definitions\Reusable;
+use BIWEB\LaravelOpenapi\OpenApi\Objects;
+
+class {{ class }} extends Parameters implements Reusable
+{
+    public function build(): array
+    {
+        return [
+            Objects\Parameter::query()->name('page')->schema(Objects\Schema::integer()),
+        ];
+    }
+}

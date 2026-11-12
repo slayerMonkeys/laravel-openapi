@@ -100,7 +100,7 @@ T7 et T8 sont indépendantes une fois T6 terminée. Il en va de même pour T13 e
 
 - [x] T11 : multi-documents + sécurité
 - [x] T12 : commande `openapi:generate` (JSON/YAML)
-- [ ] T13 : commandes `make:openapi-schema|parameters|request-body|response`
+- [x] T13 : commandes `make:openapi-schema|parameters|request-body|response`
 - [ ] T14 : route qui sert le fichier
 - [ ] T15 : README + CLAUDE.md
 

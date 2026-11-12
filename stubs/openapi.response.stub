@@ -1,0 +1,16 @@
+<?php
+
+namespace {{ namespace }};
+
+use BIWEB\LaravelOpenapi\Definitions\Response;
+use BIWEB\LaravelOpenapi\Definitions\Reusable;
+use BIWEB\LaravelOpenapi\OpenApi\Objects;
+
+class {{ class }} extends Response implements Reusable
+{
+    public function build(): Objects\Response
+    {
+        return Objects\Response::ok()
+            ->content(Objects\MediaType::json()->schema(Objects\Schema::object()));
+    }
+}
