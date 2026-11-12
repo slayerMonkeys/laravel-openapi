@@ -5,8 +5,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project state
 
 `biweb/laravel-openapi` is a Laravel package (not an application), started from the Spatie `package-skeleton-laravel`
-template. It generates OpenAPI 3.0/3.1 documents from PHP attributes and definition classes. `SPEC.md` is the
-contract (in French), and `tasks/plan.md` / `tasks/todo.md` track the v1 tasks and decisions.
+template. It generates OpenAPI 3.0/3.1 documents from PHP attributes and definition classes. `README.md` documents
+the public behavior.
 
 There is no `workbench/`: test fixtures under `tests/Fixtures/` are enough. Git flow: feature branches off `develop`,
 PRs into `develop`.
