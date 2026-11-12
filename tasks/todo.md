@@ -208,12 +208,12 @@ Le nom du composant vient de l'`objectId`, sinon du nom court de la classe.
 
 **Critères d'acceptation :**
 
-- [ ] Une classe `Schema` réutilisable donne un `$ref`, et une classe non réutilisable donne le schéma en ligne.
-- [ ] Le mélange fonctionne dans les deux sens : `Schema::ref(UserData::class)` dans un `build()`, et
+- [x] Une classe `Schema` réutilisable donne un `$ref`, et une classe non réutilisable donne le schéma en ligne.
+- [x] Le mélange fonctionne dans les deux sens : `Schema::ref(UserData::class)` dans un `build()`, et
   `#[Property(items: UserSchema::class)]` dans un DTO.
-- [ ] Une classe `Response` réutilisable est émise sous son code HTTP, lu sur l'objet construit.
-- [ ] Une classe `Parameters` réutilisable donne un composant par paramètre.
-- [ ] Une dépendance injectée dans le constructeur d'une définition est résolue par le container.
+- [x] Une classe `Response` réutilisable est émise sous son code HTTP, lu sur l'objet construit.
+- [x] Une classe `Parameters` réutilisable donne un composant par paramètre.
+- [x] Une dépendance injectée dans le constructeur d'une définition est résolue par le container.
 
 **Vérification :** `vendor/bin/pest tests/Unit/DefinitionsTest.php`
 

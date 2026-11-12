@@ -1,6 +1,7 @@
 <?php
 
 use BIWEB\LaravelOpenapi\Exceptions\InvalidOpenapiDefinition;
+use BIWEB\LaravelOpenapi\OpenApi\Objects\BaseObject;
 use BIWEB\LaravelOpenapi\SchemaFactory;
 use BIWEB\LaravelOpenapi\Tests\Fixtures\Data\ItemlessData;
 use BIWEB\LaravelOpenapi\Tests\Fixtures\Data\NotASchema;
@@ -122,5 +123,5 @@ it('describes a backed enum by its backing type and values', function (string $c
 // nested classes stay class-string references until Components resolves them
 function built(string $class, string $version): array
 {
-    return (new SchemaFactory)->build($class)->resolveRefs(fn (string $nested) => "#/{$nested}")->toArray($version);
+    return (new SchemaFactory)->build($class)->resolveRefs(fn (BaseObject $nested) => $nested::ref("#/{$nested->getRef()}", $nested->getObjectId()))->toArray($version);
 }
