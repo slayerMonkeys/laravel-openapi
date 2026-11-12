@@ -50,9 +50,9 @@ Vérification commune à chaque tâche : `composer test`, `composer analyse`, `v
 **Description :** pour une action `Class@__invoke`, les attributs d'opération sont lus sur la classe ou sur `__invoke`. Les deux à la fois lèvent une erreur. Sur un contrôleur classique, les attributs de classe sont ignorés.
 
 **Critères d'acceptation :**
-- [ ] `Route::get('/users/{id}', ShowUserAction::class)` (attributs sur la classe) et une autre Action annotée sur `__invoke` produisent chacune l'opération attendue, identique à celle d'un contrôleur classique annoté de la même façon.
-- [ ] Une Action annotée sur la classe et sur `__invoke` lève `InvalidOpenapiDefinition`, avec un message qui nomme la classe.
-- [ ] Un `#[Operation]` posé sur la classe d'un contrôleur non invocable n'a aucun effet.
+- [x] `Route::get('/users/{id}', ShowUserAction::class)` (attributs sur la classe) et une autre Action annotée sur `__invoke` produisent chacune l'opération attendue, identique à celle d'un contrôleur classique annoté de la même façon.
+- [x] Une Action annotée sur la classe et sur `__invoke` lève `InvalidOpenapiDefinition`, avec un message qui nomme la classe.
+- [x] Un `#[Operation]` posé sur la classe d'un contrôleur non invocable n'a aucun effet.
 
 **Vérification :** `vendor/bin/pest tests/Feature/InvokableActionTest.php`
 

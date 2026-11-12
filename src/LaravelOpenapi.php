@@ -7,11 +7,15 @@ use BIWEB\LaravelOpenapi\Attributes\Parameter;
 use BIWEB\LaravelOpenapi\Exceptions\InvalidOpenapiDefinition;
 use Illuminate\Routing\Route;
 use Illuminate\Support\Facades\Route as Router;
+use Illuminate\Support\Str;
+use ReflectionClass;
 use ReflectionMethod;
 use stdClass;
 
 class LaravelOpenapi
 {
+    private const OPERATION_ATTRIBUTES = [Operation::class, Parameter::class];
+
     /** @return array<string, mixed> */
     public function generate(?string $document = null): array
     {
@@ -52,8 +56,10 @@ class LaravelOpenapi
                 continue;
             }
 
-            $method = new ReflectionMethod($class, $route->getActionMethod());
-            $operation = ($method->getAttributes(Operation::class)[0] ?? null)?->newInstance();
+            // same as the protected Route::getControllerMethod(): getActionMethod() returns the class name for an invokable action
+            $method = new ReflectionMethod($class, Str::parseCallback($route->getAction('uses'))[1]);
+            $source = $this->attributeSource($class, $method);
+            $operation = ($source->getAttributes(Operation::class)[0] ?? null)?->newInstance();
 
             if ($operation === null) {
                 continue;
@@ -69,11 +75,42 @@ class LaravelOpenapi
             $path = '/'.ltrim(str_replace('?}', '}', $route->uri()), '/');
 
             foreach ($verbs as $verb) {
-                $paths[$path][$verb] = $this->operation($operation, $method, $route);
+                $paths[$path][$verb] = $this->operation($operation, $source, $route);
             }
         }
 
         return $paths;
+    }
+
+    /**
+     * An invokable action (ADR) may carry its operation attributes on the class instead of __invoke, never on both.
+     *
+     * @param  class-string  $class
+     * @return ReflectionClass<object>|ReflectionMethod
+     */
+    private function attributeSource(string $class, ReflectionMethod $method): ReflectionClass|ReflectionMethod
+    {
+        if ($method->name !== '__invoke' || ! $this->hasOperationAttributes($reflection = new ReflectionClass($class))) {
+            return $method;
+        }
+
+        if ($this->hasOperationAttributes($method)) {
+            throw new InvalidOpenapiDefinition("Action [{$class}] has operation attributes on both the class and __invoke.");
+        }
+
+        return $reflection;
+    }
+
+    /** @param  ReflectionClass<object>|ReflectionMethod  $reflection */
+    private function hasOperationAttributes(ReflectionClass|ReflectionMethod $reflection): bool
+    {
+        foreach (self::OPERATION_ATTRIBUTES as $attribute) {
+            if ($reflection->getAttributes($attribute) !== []) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /** @param  list<string>  $prefixes */
@@ -90,8 +127,11 @@ class LaravelOpenapi
         return false;
     }
 
-    /** @return array<string, mixed> */
-    private function operation(Operation $operation, ReflectionMethod $method, Route $route): array
+    /**
+     * @param  ReflectionClass<object>|ReflectionMethod  $source
+     * @return array<string, mixed>
+     */
+    private function operation(Operation $operation, ReflectionClass|ReflectionMethod $source, Route $route): array
     {
         preg_match_all('/\{(\w+)\??\}/', $route->uri(), $matches);
 
@@ -102,7 +142,7 @@ class LaravelOpenapi
             $parameters["path.{$name}"] = ['name' => $name, 'in' => 'path', 'required' => true, 'schema' => ['type' => 'string']];
         }
 
-        foreach ($method->getAttributes(Parameter::class) as $attribute) {
+        foreach ($source->getAttributes(Parameter::class) as $attribute) {
             $parameter = $attribute->newInstance();
             $in = $parameter->in ?? (in_array($parameter->name, $matches[1], true) ? 'path' : 'query');
 
