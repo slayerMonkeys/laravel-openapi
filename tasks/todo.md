@@ -70,7 +70,7 @@ Vérification commune à chaque tâche : `composer test`, `composer analyse`, `v
 
 ---
 
-## Phase 2 : schémas
+## Phase 2 : modèle objet et schémas
 
 ### T4 : `#[Schema]` / `#[Property]` : scalaires, nullable, required
 
@@ -92,40 +92,168 @@ Vérification commune à chaque tâche : `composer test`, `composer analyse`, `v
 
 ---
 
-### T5 : `$ref` imbriqués, tableaux, enums, collisions
+### T5 : modèle objet OpenAPI + sérialisation 3.0/3.1
 
-**Description :** une propriété typée par une classe `#[Schema]` produit un `$ref`, et la classe référencée est enregistrée à son tour (une seule fois, même en cas de cycle). Un `array` exige `#[Property(items: …)]` (class-string ou type scalaire). Un `BackedEnum` donne le type de son backing et ses valeurs en `enum`. Deux classes qui donnent le même nom de composant lèvent une erreur.
+**Description :** on porte le builder fluent et immuable de l'ancien paquet
+(`SlayerMonkey\LaravelOpenAPI\OpenAPI\{Objects,Enums}`) vers `src/OpenApi/{Objects,Enums}`, avec les corrections de
+`plan.md` : nullables explicites, propriétés initialisées, `int|float|null`, helper `with()`, pas de `__get`.
+`toArray(string $version)` est récursif. `Schema` centralise les écarts 3.0/3.1 (`nullable`, `exclusiveMinimum`/
+`exclusiveMaximum`). Les maps vides sortent en `{}`. Un champ requis manquant lève `InvalidOpenapiDefinition` avec le
+chemin de l'objet. `ref()` accepte un pointeur `#/…` ou un `class-string`, qui est stocké pour une résolution ultérieure
+(T8).
+
+Le travail est découpé en deux lots, un commit par lot :
+
+- **T5a (cœur)** : `BaseObject`, `OpenApi`, `Info`, `Server`, `Tag`, `PathItem`, `Operation`, `Parameter`,
+  `RequestBody`, `MediaType`, `Response`, `Schema`, `Components`, `SecurityRequirement`, plus les enums.
+- **T5b (secondaires)** : `Contact`, `License`, `ServerVariable`, `ExternalDocs`, `Encoding`, `Header`, `Link`,
+  `Example`, `AllOf`/`AnyOf`/`OneOf`/`Not`, `Discriminator`, `Xml`, `SecurityScheme`, `OAuthFlow`.
 
 **Critères d'acceptation :**
-- [ ] Une référence circulaire (`User` → `Team` → `User`) se termine, avec deux composants et des `$ref`.
-- [ ] Un `array` sans `items` lève une erreur qui nomme la classe et la propriété.
-- [ ] Une collision `A\User` / `B\User` lève une erreur qui nomme les deux classes, et `#[Schema(name:)]` la résout.
 
-**Vérification :** `vendor/bin/pest tests/Unit/SchemaFactoryTest.php`
+- [ ] Chaque objet a un test : construction, immutabilité (le setter ne modifie pas l'original), `toArray` en 3.0 et en
+  3.1.
+- [ ] `Schema::string()->nullable()` donne `{type: string, nullable: true}` en 3.0 et `{type: [string, null]}` en 3.1.
+- [ ] Un document complet construit à la main avec le builder passe `toBeValidOpenapi()` en 3.0 et en 3.1.
+- [ ] Aucune signature implicitement nullable (vérifiée par PHPStan, avec les règles de dépréciation).
 
-**Dépendances :** T4
+**Vérification :** `vendor/bin/pest tests/Unit/OpenApi`
 
-**Fichiers :** `src/SchemaFactory.php`, `tests/Fixtures/Data/*.php`, `tests/Unit/SchemaFactoryTest.php`
+**Dépendances :** T1
+
+**Fichiers :** `src/OpenApi/Objects/*.php`, `src/OpenApi/Enums/*.php`, `src/OpenApi/Contracts/SchemaContract.php`,
+`tests/Unit/OpenApi/*Test.php`
+
+**Taille :** L (en deux lots M)
+
+---
+
+### T6 : migration de `generate()` et `SchemaFactory` vers les objets
+
+**Description :** `LaravelOpenapi::generate()` construit un arbre `OpenApi` et renvoie `->toArray($version)`.
+`SchemaFactory` renvoie des `Objects\Schema` au lieu de tableaux. C'est une **migration à sortie identique**.
+
+**Critères d'acceptation :**
+
+- [ ] `DocumentTest`, `OperationTest`, `InvokableActionTest` et `SchemaFactoryTest` passent sans changer les tableaux
+  attendus. Seuls les appels changent (`->toArray($version)`).
+- [ ] Il ne reste aucune construction de tableau OpenAPI à la main dans `src/`, hors de `toArray()`.
+
+**Vérification :** `composer test`
+
+**Dépendances :** T4, T5
+
+**Fichiers :** `src/LaravelOpenapi.php`, `src/SchemaFactory.php`, `tests/Unit/SchemaFactoryTest.php`
+
+**Taille :** M
+
+---
+
+### T7 : paramètres optionnels → duplication des paths
+
+**Description :** le remplacement actuel `{id?}` → `{id}` est remplacé par un `PathExpander`. Une URI avec *n* segments
+optionnels donne *n* + 1 paths. Chaque variante ne porte que ses paramètres de chemin, et l'`operationId` explicite
+reçoit le suffixe `By{Param}`.
+
+**Critères d'acceptation :**
+
+- [ ] `/posts/{post}/comments/{comment?}` donne `/posts/{post}/comments` (paramètre `post`) et
+  `/posts/{post}/comments/{comment}` (paramètres `post` et `comment`).
+- [ ] `operationId: 'listComments'` donne `listComments` et `listCommentsByComment`.
+- [ ] Le document reste valide (pas de paramètre de chemin absent de l'URI, ni d'`operationId` dupliqué).
+
+**Vérification :** `vendor/bin/pest tests/Feature/OptionalParameterTest.php`
+
+**Dépendances :** T6
+
+**Fichiers :** `src/PathExpander.php`, `src/LaravelOpenapi.php`, `tests/Fixtures/Http/CommentController.php`,
+`tests/Feature/OptionalParameterTest.php`
 
 **Taille :** S
 
 ---
 
-### T6 : `#[RequestBody]` / `#[Response]`
+### T8 : `$ref` imbriqués, tableaux, enums, collisions (registre `Components`)
 
-**Description :** les attributs `RequestBody` et `Response` (répétable, avec `isList`) sont branchés sur l'opération. Ils référencent les schémas via `SchemaFactory`. On crée le jeu de fixtures complet et les fichiers attendus `expected/document-3.0.json` et `expected/document-3.1.json`.
+**Description :** un registre `Components` (une instance par génération) résout les `class-string` en composants. Une
+propriété typée par une classe `#[Schema]` produit un `$ref`, et la classe référencée est enregistrée une seule fois,
+même en cas de cycle. Les `ref(Foo::class)` stockés dans l'arbre sont résolus en parcourant l'arbre jusqu'au point fixe.
+Un `array` exige `#[Property(items: …)]`. Un `BackedEnum` donne son type de backing et ses valeurs en `enum`. Deux
+classes qui donnent le même nom de composant lèvent une erreur.
+
+**Critères d'acceptation :**
+- [ ] Une référence circulaire (`User` → `Team` → `User`) se termine, avec deux composants et des `$ref`.
+- [ ] Un `array` sans `items` lève une erreur qui nomme la classe et la propriété.
+- [ ] Une collision `A\User` / `B\User` lève une erreur qui nomme les deux classes, et `#[Schema(name:)]` la résout.
+- [ ] Un composant qui n'est référencé nulle part n'est pas émis.
+
+**Vérification :** `vendor/bin/pest tests/Unit/SchemaFactoryTest.php tests/Unit/ComponentsTest.php`
+
+**Dépendances :** T6
+
+**Fichiers :** `src/Components.php`, `src/SchemaFactory.php`, `tests/Fixtures/Data/*.php`,
+`tests/Unit/ComponentsTest.php`
+
+**Taille :** M
+
+---
+
+### T9 : classes de définition + `Reusable`
+
+**Description :** on crée `Definitions\Schema`, `Definitions\Parameters`, `Definitions\RequestBody`,
+`Definitions\Response` (abstraites, avec `build()`) et l'interface `Definitions\Reusable`. Elles sont résolues par le
+container. Le registre `Components` les accepte au même titre que les DTO `#[Schema]` : avec `Reusable`, elles vont dans
+`components.{schemas|parameters|requestBodies|responses}` avec un `$ref`, sans `Reusable` elles sont insérées en ligne.
+Le nom du composant vient de l'`objectId`, sinon du nom court de la classe.
+
+**Critères d'acceptation :**
+
+- [ ] Une classe `Schema` réutilisable donne un `$ref`, et une classe non réutilisable donne le schéma en ligne.
+- [ ] Le mélange fonctionne dans les deux sens : `Schema::ref(UserData::class)` dans un `build()`, et
+  `#[Property(items: UserSchema::class)]` dans un DTO.
+- [ ] Une classe `Response` réutilisable est émise sous son code HTTP, lu sur l'objet construit.
+- [ ] Une classe `Parameters` réutilisable donne un composant par paramètre.
+- [ ] Une dépendance injectée dans le constructeur d'une définition est résolue par le container.
+
+**Vérification :** `vendor/bin/pest tests/Unit/DefinitionsTest.php`
+
+**Dépendances :** T8
+
+**Fichiers :** `src/Definitions/*.php`, `src/Components.php`,
+`tests/Fixtures/OpenApi/{Schemas,Parameters,RequestBodies,Responses}/*.php`, `tests/Unit/DefinitionsTest.php`
+
+**Taille :** M
+
+---
+
+### T10 : `#[RequestBody]` / `#[Response]` / `#[Parameters]`
+
+**Description :** on branche les attributs sur l'opération.
+
+- `RequestBody(body)` accepte une classe `RequestBody` de définition, ou un schéma (DTO `#[Schema]` ou classe `Schema`).
+- `Response(status)` accepte un code HTTP (avec `schema` et `isList`) ou une classe `Response` de définition. Dans ce
+  second cas, les autres arguments sont interdits.
+- `Parameters(...classes)` fusionne ses paramètres avec ceux de `#[Parameter]` (unicité `in` + `name`).
+
+On crée le jeu de fixtures complet, qui mêle attributs et classes de définition, puis `expected/document-3.0.json` et
+`expected/document-3.1.json`.
 
 **Critères d'acceptation :**
 - [ ] `#[Response(200, schema: UserData::class, isList: true)]` donne `content.application/json.schema = {type: array, items: {$ref}}`.
 - [ ] `#[Response(204, 'Supprimé')]` est émis sans `content`.
-- [ ] Une réponse `JsonResource` est enveloppée selon `$wrap` (`{data: $ref}`, ou `data` en tableau avec `isList`), et ne l'est pas si `$wrap` vaut `null`.
+- [ ] `#[Response(UserCreatedResponse::class)]` (réutilisable) donne
+  `responses.201 = {$ref: '#/components/responses/UserCreated'}`, et `#[Response(UserCreatedResponse::class, 'x')]` lève
+  une erreur.
+- [ ] Une réponse `JsonResource` est enveloppée selon `$wrap`.
+- [ ] La même opération décrite par attributs et par classes de définition donne une sortie équivalente.
 - [ ] Les fixtures complètes sont valides et égales aux fichiers `expected/`, en 3.0 et en 3.1.
 
 **Vérification :** `vendor/bin/pest tests/Feature/FullDocumentTest.php`
 
-**Dépendances :** T3, T5
+**Dépendances :** T3, T7, T9
 
-**Fichiers :** `src/Attributes/RequestBody.php`, `src/Attributes/Response.php`, `src/LaravelOpenapi.php`, `tests/Fixtures/expected/*.json`, `tests/Feature/FullDocumentTest.php`
+**Fichiers :** `src/Attributes/{RequestBody,Response,Parameters}.php`, `src/LaravelOpenapi.php`,
+`tests/Fixtures/expected/*.json`, `tests/Feature/FullDocumentTest.php`
 
 **Taille :** M
 
@@ -133,24 +261,29 @@ Vérification commune à chaque tâche : `composer test`, `composer analyse`, `v
 
 ### Checkpoint B
 - [ ] Les fixtures complètes génèrent des documents 3.0 et 3.1 valides et égaux à `expected/*.json`
-- [ ] Revue humaine des fichiers `expected/`
+- [ ] Revue humaine des fichiers `expected/` et de l'API publique du builder (figée après la release)
 
 ---
 
 ## Phase 3 : multi-documents et sorties
 
-### T7 : multi-documents + sécurité
+### T11 : multi-documents + sécurité
 
-**Description :** `Operation::documents` restreint une opération à certains documents, et chaque document filtre sur ses propres préfixes. Les `security_schemes` de la config vont dans `components.securitySchemes`, et le `security` global du document est émis à la racine.
+**Description :** `Operation::documents` restreint une opération à certains documents, et chaque document filtre sur ses
+propres préfixes. Les `security_schemes` de la config (tableaux) sont convertis en `Objects\SecurityScheme` dans
+`components.securitySchemes`, et le `security` global est émis à la racine. Chaque document a son propre registre
+`Components` : un composant n'apparaît que dans les documents qui le référencent.
 
 **Critères d'acceptation :**
-- [ ] Deux documents (`public` sur `api`, `internal` sur `internal`) ne contiennent chacun que leurs routes.
-- [ ] Une opération avec `documents: ['internal']` est absente de `public`, même si elle est dans son préfixe.
+
+- [ ] Deux documents (`public` sur `api`, `internal` sur `internal`) ne contiennent chacun que leurs routes **et leurs
+  composants**.
+- [ ] Une opération avec `documents: ['internal']` est absente de `public`.
 - [ ] Les `securitySchemes` et le `security` global sont présents, et le document reste valide.
 
 **Vérification :** `vendor/bin/pest tests/Feature/MultiDocumentTest.php`
 
-**Dépendances :** T6
+**Dépendances :** T10
 
 **Fichiers :** `src/LaravelOpenapi.php`, `tests/Feature/MultiDocumentTest.php`, `tests/Fixtures/Http/InternalController.php`
 
@@ -158,18 +291,18 @@ Vérification commune à chaque tâche : `composer test`, `composer analyse`, `v
 
 ---
 
-### T8 : commande `openapi:generate`
+### T12 : commande `openapi:generate`
 
 **Description :** la commande `openapi:generate {document?} {--all} {--output=} {--format=}` remplace le placeholder. Le format vient de `--format`, sinon de l'extension. Le YAML passe par `symfony/yaml` (avec `DUMP_OBJECT_AS_MAP`). Les répertoires manquants sont créés. Les erreurs `InvalidOpenapiDefinition` donnent un message et le code `FAILURE`.
 
 **Critères d'acceptation :**
 - [ ] Le fichier JSON écrit est égal à `generate()`, et le YAML relu par `Yaml::parse` est égal au JSON.
-- [ ] `--all` écrit un fichier par document, au chemin `output` de chacun.
+- [ ] `--all` écrit un fichier par document.
 - [ ] Un document inconnu ou une annotation invalide donne un code de sortie non nul et un message qui nomme la cause.
 
 **Vérification :** `vendor/bin/pest tests/Feature/GenerateCommandTest.php`, et `composer update --prefer-lowest` reste vert
 
-**Dépendances :** T7
+**Dépendances :** T11
 
 **Fichiers :** `composer.json`, `src/Commands/GenerateCommand.php` (et suppression de `LaravelOpenapiCommand.php`), `src/LaravelOpenapiServiceProvider.php`, `tests/Feature/GenerateCommandTest.php`
 
@@ -177,18 +310,45 @@ Vérification commune à chaque tâche : `composer test`, `composer analyse`, `v
 
 ---
 
-### T9 : route qui sert le fichier
+### T13 : commandes `make:openapi-*`
 
-**Description :** `routes/openapi.php` enregistre `GET {route.uri}` pour chaque document qui a `route.enabled`, avec son middleware et le nom du document en `defaults`. `OpenapiController` (invocable) sert le fichier `output` avec le `Content-Type` correspondant à son extension, ou répond 404 si le fichier n'existe pas. Le fichier de routes est chargé avec `hasRoute('openapi')`.
+**Description :** `make:openapi-schema`, `make:openapi-parameters`, `make:openapi-request-body` et
+`make:openapi-response` étendent `GeneratorCommand`. Elles écrivent dans
+`app/OpenApi/{Schemas,Parameters,RequestBodies,Responses}`. L'option `--reusable` ajoute `implements Reusable`. Les
+stubs sont publiables (tag `openapi-stubs`). La génération depuis un modèle (`--model` de l'ancien paquet, qui reposait
+sur Doctrine) n'est **pas** reprise.
+
+**Critères d'acceptation :**
+
+- [ ] Chaque commande génère une classe qui compile, dans le bon namespace, et que `Components` accepte.
+- [ ] `--reusable` produit une classe émise en `$ref`.
+- [ ] Un stub publié dans `stubs/` de l'application remplace celui du paquet.
+
+**Vérification :** `vendor/bin/pest tests/Feature/MakeCommandsTest.php`
+
+**Dépendances :** T9, T12
+
+**Fichiers :** `src/Commands/Make*Command.php`, `stubs/*.stub`, `src/LaravelOpenapiServiceProvider.php`,
+`tests/Feature/MakeCommandsTest.php`
+
+**Taille :** S
+
+---
+
+### T14 : route qui sert le fichier
+
+**Description :** `routes/openapi.php` enregistre `GET {route.uri}` pour chaque document qui a `route.enabled`, avec son
+middleware et le nom du document en `defaults`. `OpenapiController` (invocable) sert le fichier `output` avec le
+`Content-Type` correspondant à son extension, ou répond 404 si le fichier n'existe pas.
 
 **Critères d'acceptation :**
 - [ ] Route désactivée → 404 ; route activée sans fichier → 404.
-- [ ] Route activée avec un fichier `.json` → 200 avec `application/json` ; fichier `.yaml` → 200 avec `application/yaml`.
-- [ ] Le middleware configuré est appliqué, et `route:cache` fonctionne (pas de closure).
+- [ ] Fichier `.json` → 200 avec `application/json` ; fichier `.yaml` → 200 avec `application/yaml`.
+- [ ] Le middleware configuré est appliqué, et `route:cache` fonctionne.
 
 **Vérification :** `vendor/bin/pest tests/Feature/RouteTest.php`
 
-**Dépendances :** T8
+**Dépendances :** T12
 
 **Fichiers :** `routes/openapi.php`, `src/Http/OpenapiController.php`, `src/LaravelOpenapiServiceProvider.php`, `tests/Feature/RouteTest.php`
 
@@ -196,18 +356,23 @@ Vérification commune à chaque tâche : `composer test`, `composer analyse`, `v
 
 ---
 
-### T10 : README + CLAUDE.md
+### T15 : README + CLAUDE.md
 
-**Description :** le README boilerplate est remplacé par la doc d'usage : installation, config, attributs (contrôleur classique et Action ADR), commande, route, et rappel de relancer `openapi:generate` au déploiement. La section « Project state » de `CLAUDE.md` est mise à jour (elle dit encore que les tests et phpstan sont absents et qu'il n'y a pas de dépôt git). Une entrée est ajoutée dans `CHANGELOG.md`.
+**Description :** le README boilerplate est remplacé par la doc d'usage : installation, config, attributs (contrôleur
+classique et Action ADR), **builder objet et classes de définition**, commandes `make:openapi-*`, `openapi:generate`,
+route, et rappel de relancer `openapi:generate` au déploiement. La section « Project state » de `CLAUDE.md` est mise à
+jour, et une entrée est ajoutée dans `CHANGELOG.md`.
 
 **Critères d'acceptation :**
-- [ ] Les exemples du README correspondent aux fixtures testées (mêmes signatures).
-- [ ] `CLAUDE.md` décrit l'architecture réelle (attributs, `SchemaFactory`, commande, route).
-- [ ] Il ne reste plus aucun placeholder du skeleton (`My command`, `This is my package`).
+
+- [ ] Les exemples du README correspondent aux fixtures testées.
+- [ ] `CLAUDE.md` décrit l'architecture réelle (modèle objet, `Components`, `SchemaFactory`, définitions, commandes,
+  route).
+- [ ] Il ne reste plus aucun placeholder du skeleton.
 
 **Vérification :** relecture humaine ; `grep -r "This is my package\|My command"` ne renvoie rien
 
-**Dépendances :** T9
+**Dépendances :** T13, T14
 
 **Fichiers :** `README.md`, `CLAUDE.md`, `CHANGELOG.md`, `composer.json` (description)
 
@@ -216,6 +381,7 @@ Vérification commune à chaque tâche : `composer test`, `composer analyse`, `v
 ---
 
 ### Checkpoint final
-- [ ] Les 7 critères de succès de `SPEC.md` sont remplis
+
+- [ ] Les 9 critères de succès de `SPEC.md` sont remplis
 - [ ] `composer test`, `composer analyse` et `vendor/bin/pint --test` passent
 - [ ] Revue humaine avant merge dans `develop`
