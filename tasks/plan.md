@@ -41,7 +41,7 @@ T3 et T4 sont indépendantes une fois T2 terminée.
 
 ### Phase 1 : fondations et risques
 - [x] T1 : squelette du document + validateurs de test
-- [ ] T2 : `#[Operation]` / `#[Parameter]` sur contrôleur classique
+- [x] T2 : `#[Operation]` / `#[Parameter]` sur contrôleur classique
 - [ ] T3 : classes invocables (ADR)
 
 ### Checkpoint A
