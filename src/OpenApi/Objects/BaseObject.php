@@ -61,6 +61,28 @@ abstract class BaseObject
         return $clone;
     }
 
+    /**
+     * A copy of the tree whose class-string references are replaced by the `#/…` pointer $resolve returns.
+     *
+     * @param  Closure(string): string  $resolve
+     */
+    public function resolveRefs(Closure $resolve): static
+    {
+        $clone = clone $this;
+
+        if ($clone->ref !== null) {
+            $clone->ref = str_starts_with($clone->ref, '#') ? $clone->ref : $resolve($clone->ref);
+
+            return $clone;
+        }
+
+        foreach (get_object_vars($clone) as $property => $value) {
+            $clone->{$property} = self::resolveValue($value, $resolve);
+        }
+
+        return $clone;
+    }
+
     /** @return array<string, mixed> */
     public function toArray(string $version): array
     {
@@ -141,6 +163,16 @@ abstract class BaseObject
 
         // stdClass so an empty object encodes as {} instead of []
         return $array ?: new stdClass;
+    }
+
+    /** @param  Closure(string): string  $resolve */
+    private static function resolveValue(mixed $value, Closure $resolve): mixed
+    {
+        if ($value instanceof self) {
+            return $value->resolveRefs($resolve);
+        }
+
+        return is_array($value) ? array_map(fn (mixed $item) => self::resolveValue($item, $resolve), $value) : $value;
     }
 
     private static function normalize(mixed $value, string $version, string $path): mixed

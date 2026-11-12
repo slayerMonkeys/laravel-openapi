@@ -11,6 +11,7 @@ final readonly class Property
      * @param  string|null  $name  required on a class (API Resource, model), ignored on a property
      * @param  bool|null  $nullable  null means deduced from the PHP type
      * @param  bool|null  $required  null means required when not nullable and without a default value
+     * @param  string|null  $items  required on an array: a scalar type (`string`…) or a #[Schema] class
      */
     public function __construct(
         public ?string $name = null,
@@ -20,5 +21,6 @@ final readonly class Property
         public ?bool $nullable = null,
         public ?bool $required = null,
         public mixed $example = null,
+        public ?string $items = null,
     ) {}
 }
