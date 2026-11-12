@@ -18,7 +18,7 @@ T1 squelette du document + validateurs de test            ✅
      ├─ T3 classes invocables (ADR)                         ✅
      └─ T4 #[Schema] / #[Property] : scalaires, nullable    ✅
          └─ T5 modèle objet OpenAPI + sérialisation 3.0/3.1     ✅
-             └─ T6 migration de generate() et SchemaFactory vers les objets
+             └─ T6 migration de generate() et SchemaFactory vers les objets ✅
                  ├─ T7 paramètres optionnels {x?} → duplication des paths
                  └─ T8 $ref imbriqués, tableaux, enums, collisions (registre Components)
                      └─ T9 classes de définition + Reusable
@@ -84,7 +84,7 @@ T7 et T8 sont indépendantes une fois T6 terminée. Il en va de même pour T13 e
 ### Phase 2 : modèle objet et schémas
 - [x] T4 : `#[Schema]` / `#[Property]` : scalaires, nullable 3.0/3.1, required
 - [x] T5 : modèle objet OpenAPI + sérialisation 3.0/3.1
-- [ ] T6 : migration de `generate()` et `SchemaFactory` vers les objets
+- [x] T6 : migration de `generate()` et `SchemaFactory` vers les objets
 - [ ] T7 : paramètres optionnels → duplication des paths
 - [ ] T8 : `$ref` imbriqués, tableaux, enums, collisions (registre `Components`)
 - [ ] T9 : classes de définition + `Reusable`

@@ -135,9 +135,9 @@ Le travail est découpé en deux lots, un commit par lot :
 
 **Critères d'acceptation :**
 
-- [ ] `DocumentTest`, `OperationTest`, `InvokableActionTest` et `SchemaFactoryTest` passent sans changer les tableaux
+- [x] `DocumentTest`, `OperationTest`, `InvokableActionTest` et `SchemaFactoryTest` passent sans changer les tableaux
   attendus. Seuls les appels changent (`->toArray($version)`).
-- [ ] Il ne reste aucune construction de tableau OpenAPI à la main dans `src/`, hors de `toArray()`.
+- [x] Il ne reste aucune construction de tableau OpenAPI à la main dans `src/`, hors de `toArray()`.
 
 **Vérification :** `composer test`
 
