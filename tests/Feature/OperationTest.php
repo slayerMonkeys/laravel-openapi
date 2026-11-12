@@ -51,6 +51,11 @@ it('documents only annotated routes within the prefixes', function (string $vers
                 'security' => [],
             ],
         ],
+        '/api/teams' => [
+            'get' => [
+                'summary' => 'Show a team',
+            ],
+        ],
         '/api/teams/{team}' => [
             'get' => [
                 'summary' => 'Show a team',
