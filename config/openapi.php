@@ -25,6 +25,7 @@ return [
                 // 'bearer' => ['type' => 'http', 'scheme' => 'bearer'],
             ],
             'security' => [], // the global requirement, e.g. [['bearer' => []]]
+            'output' => base_path('openapi.json'), // written by openapi:generate, a .yaml/.yml extension gives YAML
         ],
     ],
 
