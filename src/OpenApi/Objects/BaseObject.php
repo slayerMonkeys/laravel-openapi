@@ -16,6 +16,9 @@ abstract class BaseObject
     /** @var list<string> fields that must be set before serialization */
     protected const REQUIRED = [];
 
+    /** @var list<string> fields that do not exist before OpenAPI 3.1, rejected when set in a 3.0 document */
+    protected const SINCE_3_1 = [];
+
     protected ?string $ref = null;
 
     /** @var array<string, mixed> */
@@ -119,6 +122,12 @@ abstract class BaseObject
         foreach (static::REQUIRED as $field) {
             if ($this->{$field} === null) {
                 throw new InvalidOpenapiDefinition('['.ltrim("{$path}.{$field}", '.').'] is required.');
+            }
+        }
+
+        foreach (str_starts_with($version, '3.0') ? static::SINCE_3_1 : [] as $field) {
+            if ($this->{$field} !== null) {
+                throw new InvalidOpenapiDefinition('['.ltrim("{$path}.{$field}", '.')."] is only available in OpenAPI 3.1, not in {$version}.");
             }
         }
 
