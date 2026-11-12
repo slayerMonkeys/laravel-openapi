@@ -342,9 +342,9 @@ middleware et le nom du document en `defaults`. `OpenapiController` (invocable) 
 `Content-Type` correspondant à son extension, ou répond 404 si le fichier n'existe pas.
 
 **Critères d'acceptation :**
-- [ ] Route désactivée → 404 ; route activée sans fichier → 404.
-- [ ] Fichier `.json` → 200 avec `application/json` ; fichier `.yaml` → 200 avec `application/yaml`.
-- [ ] Le middleware configuré est appliqué, et `route:cache` fonctionne.
+- [x] Route désactivée → 404 ; route activée sans fichier → 404.
+- [x] Fichier `.json` → 200 avec `application/json` ; fichier `.yaml` → 200 avec `application/yaml`.
+- [x] Le middleware configuré est appliqué, et `route:cache` fonctionne.
 
 **Vérification :** `vendor/bin/pest tests/Feature/RouteTest.php`
 

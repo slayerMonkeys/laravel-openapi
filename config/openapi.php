@@ -26,6 +26,12 @@ return [
             ],
             'security' => [], // the global requirement, e.g. [['bearer' => []]]
             'output' => base_path('openapi.json'), // written by openapi:generate, a .yaml/.yml extension gives YAML
+            // GET {uri} serves the output file as is, 404 until it is generated
+            'route' => [
+                'enabled' => false,
+                'uri' => 'openapi/default.json',
+                'middleware' => [],
+            ],
         ],
     ],
 
