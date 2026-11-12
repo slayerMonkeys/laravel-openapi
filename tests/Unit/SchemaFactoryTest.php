@@ -12,11 +12,11 @@ use BIWEB\LaravelOpenapi\Tests\Fixtures\Http\Resources\UserResource;
 
 function profileSchema(string $version): array
 {
-    $factory = new SchemaFactory($version);
+    $factory = new SchemaFactory;
 
-    expect($factory->ref(ProfileData::class))->toBe(['$ref' => '#/components/schemas/ProfileData']);
+    expect($factory->ref(ProfileData::class)->toArray($version))->toBe(['$ref' => '#/components/schemas/ProfileData']);
 
-    return $factory->schemas()['ProfileData'];
+    return $factory->schemas()['ProfileData']->toArray($version);
 }
 
 it('deduces the property schema from the PHP type', function (string $version, string $property, array $expected) {
@@ -58,25 +58,25 @@ it('produces a schema valid inside an OpenAPI document', function (string $versi
 })->with(['3.0.3', '3.1.0']);
 
 it('uses the name and description of #[Schema]', function () {
-    $factory = new SchemaFactory('3.1.0');
+    $factory = new SchemaFactory;
 
-    expect($factory->ref(RenamedData::class))->toBe(['$ref' => '#/components/schemas/Renamed'])
-        ->and($factory->schemas())->toBe(['Renamed' => ['type' => 'object', 'description' => 'A renamed schema.']]);
+    expect($factory->ref(RenamedData::class)->toArray('3.1.0'))->toBe(['$ref' => '#/components/schemas/Renamed'])
+        ->and(array_map(fn ($schema) => $schema->toArray('3.1.0'), $factory->schemas()))->toBe(['Renamed' => ['type' => 'object', 'description' => 'A renamed schema.']]);
 });
 
 it('rejects a class without #[Schema]', function () {
-    (new SchemaFactory('3.1.0'))->ref(NotASchema::class);
+    (new SchemaFactory)->ref(NotASchema::class);
 })->throws(InvalidOpenapiDefinition::class, 'Class ['.NotASchema::class.'] is not annotated with #[Schema].');
 
 it('rejects a property whose type cannot be deduced', function () {
-    (new SchemaFactory('3.1.0'))->ref(UnionData::class);
+    (new SchemaFactory)->ref(UnionData::class);
 })->throws(InvalidOpenapiDefinition::class, 'Property ['.UnionData::class.'::$id]');
 
 it('reads the properties declared on a JsonResource class instead of its PHP properties', function (string $version, array $nickname) {
-    $factory = new SchemaFactory($version);
+    $factory = new SchemaFactory;
 
-    expect($factory->ref(UserResource::class))->toBe(['$ref' => '#/components/schemas/UserResource'])
-        ->and($factory->schemas()['UserResource'])->toBe([
+    expect($factory->ref(UserResource::class)->toArray($version))->toBe(['$ref' => '#/components/schemas/UserResource'])
+        ->and($factory->schemas()['UserResource']->toArray($version))->toBe([
             'type' => 'object',
             'properties' => [
                 'id' => ['type' => 'integer'],
@@ -92,9 +92,9 @@ it('reads the properties declared on a JsonResource class instead of its PHP pro
 ]);
 
 it('rejects a class #[Property] without a name', function () {
-    (new SchemaFactory('3.1.0'))->ref(NamelessResource::class);
+    (new SchemaFactory)->ref(NamelessResource::class);
 })->throws(InvalidOpenapiDefinition::class, 'Class ['.NamelessResource::class.'] declares a #[Property] without a name.');
 
 it('rejects a class #[Property] without a type', function () {
-    (new SchemaFactory('3.1.0'))->ref(UntypedResource::class);
+    (new SchemaFactory)->ref(UntypedResource::class);
 })->throws(InvalidOpenapiDefinition::class, 'Property ['.UntypedResource::class.'::$id]');
