@@ -320,9 +320,9 @@ sur Doctrine) n'est **pas** reprise.
 
 **Critères d'acceptation :**
 
-- [ ] Chaque commande génère une classe qui compile, dans le bon namespace, et que `Components` accepte.
-- [ ] `--reusable` produit une classe émise en `$ref`.
-- [ ] Un stub publié dans `stubs/` de l'application remplace celui du paquet.
+- [x] Chaque commande génère une classe qui compile, dans le bon namespace, et que `Components` accepte.
+- [x] `--reusable` produit une classe émise en `$ref`.
+- [x] Un stub publié dans `stubs/` de l'application remplace celui du paquet.
 
 **Vérification :** `vendor/bin/pest tests/Feature/MakeCommandsTest.php`
 

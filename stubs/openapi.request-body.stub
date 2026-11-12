@@ -1,0 +1,17 @@
+<?php
+
+namespace {{ namespace }};
+
+use BIWEB\LaravelOpenapi\Definitions\RequestBody;
+use BIWEB\LaravelOpenapi\Definitions\Reusable;
+use BIWEB\LaravelOpenapi\OpenApi\Objects;
+
+class {{ class }} extends RequestBody implements Reusable
+{
+    public function build(): Objects\RequestBody
+    {
+        return Objects\RequestBody::create()
+            ->required()
+            ->content(Objects\MediaType::json()->schema(Objects\Schema::object()));
+    }
+}
