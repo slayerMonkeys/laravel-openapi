@@ -68,6 +68,11 @@ class Parameter extends BaseObject
         return $this->name;
     }
 
+    public function getIn(): ?ParameterIn
+    {
+        return $this->in;
+    }
+
     public function in(?ParameterIn $in): static
     {
         return $this->with('in', $in);

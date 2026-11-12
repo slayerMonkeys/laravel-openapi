@@ -239,14 +239,14 @@ On crée le jeu de fixtures complet, qui mêle attributs et classes de définiti
 `expected/document-3.1.json`.
 
 **Critères d'acceptation :**
-- [ ] `#[Response(200, schema: UserData::class, isList: true)]` donne `content.application/json.schema = {type: array, items: {$ref}}`.
-- [ ] `#[Response(204, 'Supprimé')]` est émis sans `content`.
-- [ ] `#[Response(UserCreatedResponse::class)]` (réutilisable) donne
+- [x] `#[Response(200, schema: UserData::class, isList: true)]` donne `content.application/json.schema = {type: array, items: {$ref}}`.
+- [x] `#[Response(204, 'Supprimé')]` est émis sans `content`.
+- [x] `#[Response(UserCreatedResponse::class)]` (réutilisable) donne
   `responses.201 = {$ref: '#/components/responses/UserCreated'}`, et `#[Response(UserCreatedResponse::class, 'x')]` lève
   une erreur.
-- [ ] Une réponse `JsonResource` est enveloppée selon `$wrap`.
-- [ ] La même opération décrite par attributs et par classes de définition donne une sortie équivalente.
-- [ ] Les fixtures complètes sont valides et égales aux fichiers `expected/`, en 3.0 et en 3.1.
+- [x] Une réponse `JsonResource` est enveloppée selon `$wrap`.
+- [x] La même opération décrite par attributs et par classes de définition donne une sortie équivalente.
+- [x] Les fixtures complètes sont valides et égales aux fichiers `expected/`, en 3.0 et en 3.1.
 
 **Vérification :** `vendor/bin/pest tests/Feature/FullDocumentTest.php`
 
@@ -260,7 +260,7 @@ On crée le jeu de fixtures complet, qui mêle attributs et classes de définiti
 ---
 
 ### Checkpoint B
-- [ ] Les fixtures complètes génèrent des documents 3.0 et 3.1 valides et égaux à `expected/*.json`
+- [x] Les fixtures complètes génèrent des documents 3.0 et 3.1 valides et égaux à `expected/*.json`
 - [ ] Revue humaine des fichiers `expected/` et de l'API publique du builder (figée après la release)
 
 ---
